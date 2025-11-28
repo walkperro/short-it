@@ -1,24 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { clsx } from "clsx";
 import AuthHeader from "@/components/AuthHeader";
-import { supabase } from "@/lib/supabase";
 import TVChart from "@/components/TVChart";
+import { supabase } from "@/lib/supabase";
+import { colorFor, type Ticker } from "@/lib/palette";
 
-type Ticker = "MOVE" | "GOLD" | "SILVER" | "WTI" | "US10Y" | "VIX" | "SPY" | "QQQ";
-const UNIVERSE: Ticker[] = ["MOVE","GOLD","SILVER","WTI","US10Y","VIX","SPY","QQQ"];
 type Gran = "1D" | "1W" | "1M" | "1Y";
 type Combo = { id: string; name: string; tickers: Ticker[] };
 type Watch = { id: string; name: string; tickers: Ticker[] };
 
+const UNIVERSE: Ticker[] = ["MOVE","GOLD","SILVER","WTI","US10Y","VIX","SPY","QQQ"];
 const uid = (p="id") => `${p}_${Math.random().toString(36).slice(2,9)}`;
 
 export default function Page(){
+  // auth
   const [email, setEmail] = useState<string|null>(null);
   const [userId, setUserId] = useState<string|null>(null);
-
-  // auth state
   useEffect(()=>{
     supabase.auth.getUser().then(({ data }) => {
       setEmail(data.user?.email ?? null);
@@ -36,30 +35,31 @@ export default function Page(){
   const [normalize, setNormalize] = useState<boolean>(true);
   const [selected, setSelected] = useState<Ticker[]>(["SPY","US10Y"]);
 
-  // Server data fetch (live) for each selected symbol
+  // data
   const [loading, setLoading] = useState(false);
-  const [series, setSeries] = useState<Record<string, { time: number; value: number }[]>>({});
+  const [series, setSeries] = useState<Record<string, { time:number; value:number }[]>>({});
 
   async function loadData(){
     setLoading(true);
-    const entries = await Promise.all(selected.map(async s => {
-      const r = await fetch(`/api/timeseries?symbol=${s}&gran=${gran}&normalize=${normalize}`);
-      const j = await r.json();
-      return [s, j.data || []] as const;
-    }));
-    const map: any = {};
-    entries.forEach(([k,v]) => map[k] = v);
-    setSeries(map);
-    setLoading(false);
+    try{
+      const pairs = await Promise.all(selected.map(async s => {
+        const r = await fetch(`/api/timeseries?symbol=${s}&gran=${gran}&normalize=${normalize}`);
+        const j = await r.json();
+        if (!r.ok || !j?.data) return [s, []] as const;
+        return [s, j.data] as const;
+      }));
+      const map: any = {};
+      pairs.forEach(([k,v]) => map[k] = v);
+      setSeries(map);
+    } finally {
+      setLoading(false);
+    }
   }
-
   useEffect(()=>{ loadData(); /* eslint-disable-next-line */ },[selected, gran, normalize]);
 
-  // Supabase persistence
+  // persistence
   const [combos, setCombos] = useState<Combo[]>([]);
   const [lists, setLists] = useState<Watch[]>([]);
-
-  // load from Supabase (or localStorage)
   useEffect(()=>{
     async function loadPersisted(){
       if (userId) {
@@ -68,7 +68,6 @@ export default function Page(){
         setLists((wl || []).map(w=>({ id: w.id, name: w.name, tickers: w.tickers })));
         setCombos((cb || []).map(c=>({ id: c.id, name: c.name, tickers: c.tickers })));
       } else {
-        // local fallback
         const L = JSON.parse(localStorage.getItem("guest:lists") || JSON.stringify([{id:uid("list"), name:"My Watchlist", tickers:["SPY","QQQ","VIX"]}]));
         const C = JSON.parse(localStorage.getItem("guest:combos") || "[]");
         setLists(L); setCombos(C);
@@ -77,7 +76,9 @@ export default function Page(){
     loadPersisted();
   },[userId]);
 
-  // save helpers
+  // actions
+  const toggle = (t: Ticker) => setSelected(p => p.includes(t) ? p.filter(x=>x!==t) : [...p, t]);
+
   async function saveCombo(){
     const name = prompt("Combo name?", `Combo ${combos.length+1}`) || `Combo ${combos.length+1}`;
     if (!userId) {
@@ -116,10 +117,32 @@ export default function Page(){
     if (data) setLists(lists.map(x=> x.id===id ? { id: data.id, name: data.name, tickers: data.tickers } : x));
   }
 
-  const toggle = (t: Ticker) => setSelected(p => p.includes(t) ? p.filter(x=>x!==t) : [...p, t]);
+  async function deleteList(id: string){
+    if (!confirm("Delete this list?")) return;
+    if (!userId) {
+      const next = lists.filter(l=>l.id!==id);
+      setLists(next); localStorage.setItem("guest:lists", JSON.stringify(next)); return;
+    }
+    await supabase.from("watchlists").delete().eq("id", id);
+    setLists(lists.filter(l=>l.id!==id));
+  }
+
+  async function deleteCombo(id: string){
+    if (!confirm("Delete this combo?")) return;
+    if (!userId) {
+      const next = combos.filter(c=>c.id!==id);
+      setCombos(next); localStorage.setItem("guest:combos", JSON.stringify(next)); return;
+    }
+    await supabase.from("combos").delete().eq("id", id);
+    setCombos(combos.filter(c=>c.id!==id));
+  }
 
   const shareList = async (l: Watch) => {
     const text = `Short-It Watchlist → ${l.name}: ${l.tickers.join(", ")}`;
+    try { await navigator.clipboard.writeText(text); alert("Copied!"); } catch { prompt("Copy:", text); }
+  };
+  const shareCombo = async (c: Combo) => {
+    const text = `Short-It Combo → ${c.name}: ${c.tickers.join(", ")}`;
     try { await navigator.clipboard.writeText(text); alert("Copied!"); } catch { prompt("Copy:", text); }
   };
 
@@ -129,7 +152,7 @@ export default function Page(){
       <header className="sticky top-0 z-20 border-b mb-4" style={{borderColor:"#1e1e22", background:"#111113"}}>
         <div className="py-3 flex items-center gap-3">
           <div className="text-xl font-semibold tracking-tight">SHORT-IT</div>
-          <div className="text-xs px-2 py-1 rounded" style={{background:"#7f1d1d"}}>Bear-mode ✦ v0.2 (live)</div>
+          <div className="text-xs px-2 py-1 rounded" style={{background:"#7f1d1d"}}>Bear-mode ✦ v0.3 (live)</div>
           <AuthHeader />
         </div>
       </header>
@@ -151,7 +174,7 @@ export default function Page(){
             </div>
           </div>
 
-          <TVChart tickers={selected} normalize={normalize} />
+          <TVChart tickers={selected} seriesMap={series} />
           <div className="text-xs opacity-70 mt-2">{loading ? "Loading data…" : "Live data via /api/timeseries (ETF proxies if needed). Not financial advice."}</div>
         </div>
 
@@ -160,11 +183,19 @@ export default function Page(){
           <div className="p-3 rounded-xl border" style={{borderColor:"#1e1e22", background:"#111113"}}>
             <div className="font-semibold mb-2">Tickers</div>
             <div className="grid grid-cols-2 gap-2">
-              {UNIVERSE.map(t=>(
-                <button key={t} onClick={()=>toggle(t)} className={clsx("px-2 py-1 rounded border text-left", selected.includes(t)? "" : "opacity-70")} style={{borderColor:"#1e1e22", background: selected.includes(t) ? "#7f1d1d" : "transparent"}}>
-                  <span className="text-sm">{t}</span>
-                </button>
-              ))}
+              {UNIVERSE.map(t=>{
+                const active = selected.includes(t);
+                return (
+                  <button
+                    key={t}
+                    onClick={()=>toggle(t)}
+                    className={clsx("px-2 py-1 rounded border text-left", active ? "" : "opacity-70")}
+                    style={{borderColor:"#1e1e22", background: active ? colorFor(t)+"22" : "transparent"}}
+                  >
+                    <span className="text-sm" style={{color: active ? colorFor(t) : "inherit"}}>{t}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -178,7 +209,10 @@ export default function Page(){
                 <div key={l.id} className="rounded-lg p-2 border" style={{borderColor:"#1e1e22"}}>
                   <div className="flex items-center justify-between">
                     <div className="font-medium">{l.name}</div>
-                    <button onClick={()=>shareList(l)} className="text-xs px-2 py-1 rounded border" style={{borderColor:"#1e1e22"}}>Share</button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={()=>shareList(l)} className="text-xs px-2 py-1 rounded border" style={{borderColor:"#1e1e22"}}>Share</button>
+                      <button onClick={()=>deleteList(l.id)} className="text-xs px-2 py-1 rounded border" style={{borderColor:"#1e1e22"}}>Delete</button>
+                    </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {l.tickers.map(t=> <span key={t} className="text-xs px-2 py-1 rounded border" style={{borderColor:"#1e1e22"}}>{t}</span>)}
@@ -198,10 +232,16 @@ export default function Page(){
             <div className="space-y-2">
               {combos.length === 0 && <div className="text-sm opacity-70">No combos yet. Click "Save Combo".</div>}
               {combos.map(c=>(
-                <button key={c.id} onClick={()=>setSelected(c.tickers)} className="w-full text-left px-3 py-2 rounded border" style={{borderColor:"#1e1e22"}}>
-                  <div className="font-medium">{c.name}</div>
-                  <div className="text-xs opacity-80">{c.tickers.join(" · ")}</div>
-                </button>
+                <div key={c.id} className="w-full text-left px-3 py-2 rounded border" style={{borderColor:"#1e1e22"}}>
+                  <div className="flex items-center justify-between">
+                    <button onClick={()=>setSelected(c.tickers)} className="font-medium text-left">{c.name}</button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={()=>shareCombo(c)} className="text-xs px-2 py-1 rounded border" style={{borderColor:"#1e1e22"}}>Share</button>
+                      <button onClick={()=>deleteCombo(c.id)} className="text-xs px-2 py-1 rounded border" style={{borderColor:"#1e1e22"}}>Delete</button>
+                    </div>
+                  </div>
+                  <div className="text-xs opacity-80 mt-1">{c.tickers.join(" · ")}</div>
+                </div>
               ))}
             </div>
           </div>
@@ -209,7 +249,7 @@ export default function Page(){
       </div>
 
       <footer className="mt-6 opacity-60 text-xs">
-        Signed in: {email ?? "guest (local only)"} — Live data via providers; MOVE may be proxied.
+        Signed in: {email ?? "guest (local only)"} — MOVE may be proxied or unavailable.
       </footer>
     </div>
   );

@@ -16,8 +16,17 @@ export default function SignInPage() {
       email,
       options: { emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/` : undefined }
     });
-    if (error) setError(error.message);
-    else setSent(true);
+    if (error) {
+      const msg = error.message || "";
+      // Supabase sometimes returns a DB error even though it sent the email.
+      if (/saving new user|already/i.test(msg)) {
+        setSent(true);
+        return;
+      }
+      setError(msg);
+      return;
+    }
+    setSent(true);
   }
 
   return (

@@ -2,65 +2,77 @@
 
 import { useEffect, useRef } from "react";
 import { createChart, ColorType, ISeriesApi, UTCTimestamp } from "lightweight-charts";
+import { colorFor, type Ticker } from "@/lib/palette";
 
-type SeriesPoint = { time: UTCTimestamp; value: number };
-type Ticker = "MOVE" | "GOLD" | "SILVER" | "WTI" | "US10Y" | "VIX" | "SPY" | "QQQ";
-
-function synthSeries(base: number, n: number, stepDays = 1): SeriesPoint[] {
-  const out: SeriesPoint[] = [];
-  const now = Math.floor(Date.now() / 1000);
-  let v = base;
-  for (let i = n - 1; i >= 0; i--) {
-    const idx = n - 1 - i;
-    const rnd = Math.sin(idx * 0.23) * 0.7 + Math.cos(idx * 0.11) * 0.5;
-    v = Math.max(0.0001, v + rnd + 0.02);
-    out.push({ time: (now - i * 86400 * stepDays) as UTCTimestamp, value: Number(v.toFixed(2)) });
-  }
-  return out;
-}
-
-const bases: Record<Ticker, number> = {
-  MOVE: 110, GOLD: 1900, SILVER: 24, WTI: 78, US10Y: 4.2, VIX: 16, SPY: 500, QQQ: 430
-};
+type Point = { time: number; value: number }; // time = ms epoch
 
 export default function TVChart({
   tickers,
-  normalize = true
+  seriesMap
 }: {
   tickers: Ticker[];
-  normalize?: boolean;
+  seriesMap: Record<string, Point[]>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const seriesRef = useRef<Record<Ticker, ISeriesApi<"Line">>>({} as any);
+  const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
+  const lineSeriesRef = useRef<Record<string, ISeriesApi<"Line">>>({});
 
   useEffect(() => {
     if (!ref.current) return;
-    const chart = createChart(ref.current, {
-      layout: { background: { type: ColorType.Solid, color: "#0b0b0c" }, textColor: "#a0a0a8" },
-      grid: { vertLines: { color: "#1e1e22" }, horzLines: { color: "#1e1e22" } },
-      rightPriceScale: { borderColor: "#1e1e22" },
-      timeScale: { borderColor: "#1e1e22" }
-    });
+    // init once
+    if (!chartRef.current) {
+      chartRef.current = createChart(ref.current, {
+        layout: { background: { type: ColorType.Solid, color: "#0b0b0c" }, textColor: "#a0a0a8" },
+        grid: { vertLines: { color: "#1e1e22" }, horzLines: { color: "#1e1e22" } },
+        rightPriceScale: { borderColor: "#1e1e22" },
+        timeScale: { borderColor: "#1e1e22" }
+      });
+      const handleResize = () =>
+        chartRef.current?.applyOptions({ width: ref.current?.clientWidth || 600 });
+      handleResize();
+      window.addEventListener("resize", handleResize);
+      return () => {
+        window.removeEventListener("resize", handleResize);
+        chartRef.current?.remove();
+        chartRef.current = null;
+      };
+    }
+  }, []);
 
-    const palette = ["#ef4444", "#eab308", "#60a5fa", "#22c55e", "#a78bfa", "#f97316", "#67e8f9", "#f472b6"];
+  // create/remove line series when tickers change
+  useEffect(() => {
+    if (!chartRef.current) return;
 
-    tickers.forEach((t, i) => {
-      const s = chart.addLineSeries({ color: palette[i % palette.length], lineWidth: 2 });
-      const raw = synthSeries(bases[t], 800);
-      if (normalize) {
-        const start = raw[0]?.value || 1;
-        s.setData(raw.map(p => ({ time: p.time, value: (p.value / start) * 100 })));
-      } else {
-        s.setData(raw);
+    // remove series that are no longer selected
+    for (const key of Object.keys(lineSeriesRef.current)) {
+      if (!tickers.includes(key as Ticker)) {
+        lineSeriesRef.current[key]?.priceScale()?.unsubscribeAll();
+        chartRef.current.removeSeries(lineSeriesRef.current[key]);
+        delete lineSeriesRef.current[key];
       }
-      seriesRef.current[t] = s;
+    }
+    // add any missing series
+    tickers.forEach((t) => {
+      if (!lineSeriesRef.current[t]) {
+        lineSeriesRef.current[t] = chartRef.current!.addLineSeries({
+          color: colorFor(t),
+          lineWidth: 2
+        });
+      }
     });
+  }, [tickers]);
 
-    const handleResize = () => chart.applyOptions({ width: ref.current?.clientWidth || 600 });
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => { window.removeEventListener("resize", handleResize); chart.remove(); };
-  }, [tickers, normalize]);
+  // push data whenever seriesMap changes
+  useEffect(() => {
+    if (!chartRef.current) return;
+    tickers.forEach((t) => {
+      const s = lineSeriesRef.current[t];
+      const data = seriesMap[t] || [];
+      if (!s || !data.length) return;
+      // lightweight-charts expects seconds, convert ms → s
+      s.setData(data.map((p) => ({ time: (p.time / 1000) as UTCTimestamp, value: p.value })));
+    });
+  }, [seriesMap, tickers]);
 
   return <div className="h-[460px] w-full" ref={ref} />;
 }
