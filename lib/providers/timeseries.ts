@@ -61,7 +61,7 @@ async function polygonDaily(symbol: string): Promise<TSPoint[]> {
   const url = `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/1/day/${from.toISOString().slice(0,10)}/${to.toISOString().slice(0,10)}?adjusted=true&sort=asc&apiKey=${key}`;
   const r = await fetch(url, { cache: "no-store" });
   const j = await r.json();
-  if (!r.ok || !j?.results) throw new Error("Polygon error");
+  if (!r.ok || !j?.results) throw new Error(j?.error || "Polygon error");
   const out = j.results.map((row: any) => ({ time: row.t, value: row.c }));
   cacheSet(cacheKey, out);
   return out;
@@ -69,7 +69,7 @@ async function polygonDaily(symbol: string): Promise<TSPoint[]> {
 
 export async function fetchTimeseries(symbol: string): Promise<TSPoint[]> {
   if (process.env.POLYGON_API_KEY) {
-    try { return await polygonDaily(symbol); } catch {}
+    try { return await polygonDaily(symbol); } catch (e) { /* fallback below */ }
   }
   return alphaVantageDaily(symbol);
 }
@@ -81,16 +81,26 @@ export function normalize(points: TSPoint[]): TSPoint[] {
 }
 
 export function resolveSymbol(appSymbol: string): string | null {
-  const polygon = !!process.env.POLYGON_API_KEY;
-  if (appSymbol === "MOVE") return null;
-  if (polygon) {
+  const usingPolygon = !!process.env.POLYGON_API_KEY;
+
+  if (appSymbol === "MOVE") return null; // licensed, skip
+
+  if (usingPolygon) {
+    // Valid & reliable Polygon tickers
+    // Indices must be prefixed with I:
     const map: Record<string,string> = {
-      SPY:"SPY", QQQ:"QQQ", VIX:"^VIX",
-      US10Y:"TNX",
-      WTI:"CL=F", GOLD:"XAUUSD", SILVER:"XAGUSD"
+      SPY:"SPY",
+      QQQ:"QQQ",
+      VIX:"I:VIX",     // CBOE Volatility Index
+      US10Y:"I:TNX",   // 10-Year Treasury Yield Index
+      GOLD:"GLD",      // safer ETF fallback
+      SILVER:"SLV",
+      WTI:"USO"        // oil ETF fallback
     };
     return map[appSymbol] || appSymbol;
   }
+
+  // AlphaVantage ETF fallbacks
   const map: Record<string,string> = {
     SPY:"SPY", QQQ:"QQQ", VIX:"VIXY",
     US10Y:"IEF", WTI:"USO", GOLD:"GLD", SILVER:"SLV"

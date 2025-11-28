@@ -33,7 +33,7 @@ export default function Page(){
   // UI state
   const [gran, setGran] = useState<Gran>("1D");
   const [normalize, setNormalize] = useState<boolean>(true);
-  const [selected, setSelected] = useState<Ticker[]>(["SPY","US10Y"]);
+  const [selected, setSelected] = useState<Ticker[]>(["SPY"]);
 
   // data
   const [loading, setLoading] = useState(false);
