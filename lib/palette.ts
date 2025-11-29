@@ -1,14 +1,16 @@
 export type Ticker = "MOVE"|"GOLD"|"SILVER"|"WTI"|"US10Y"|"VIX"|"SPY"|"QQQ";
 
-const palette: Record<Ticker,string> = {
-  SPY:"#ef4444",
-  QQQ:"#eab308",
-  VIX:"#60a5fa",
-  US10Y:"#22c55e",
-  MOVE:"#a78bfa",
-  GOLD:"#f97316",
-  SILVER:"#67e8f9",
-  WTI:"#f472b6"
+const COLORS: Record<string,string> = {
+  MOVE:  "#ef4444", // red
+  GOLD:  "#f59e0b", // amber
+  SILVER:"#14b8a6", // teal
+  WTI:   "#d946ef", // fuchsia
+  US10Y: "#22c55e", // green
+  VIX:   "#60a5fa", // blue
+  SPY:   "#f87171", // soft red
+  QQQ:   "#eab308", // yellow
 };
 
-export const colorFor = (t:Ticker) => palette[t];
+export function colorFor(sym: string): string {
+  return COLORS[sym] ?? "#e5e7eb";
+}

@@ -1,90 +1,89 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { createChart, ColorType, ISeriesApi, UTCTimestamp } from "lightweight-charts";
-import { colorFor, type Ticker } from "@/lib/palette";
+import { useEffect, useMemo, useRef } from "react";
+import { createChart, ColorType, LineStyle, ISeriesApi, UTCTimestamp } from "lightweight-charts";
+import { colorFor } from "@/lib/palette";
 
-type Point = { time: number; value: number }; // ms epoch
+type Point = { time: number; value: number };
+type Props = {
+  tickers: string[];                                  // active selection (e.g., ["SPY","QQQ","VIX"])
+  seriesMap: Record<string, Point[]>;                 // data per ticker [{time(ms), value}]
+};
 
-export default function TVChart({
-  tickers,
-  seriesMap
-}: {
-  tickers: Ticker[];
-  seriesMap: Record<string, Point[]>;
-}) {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
-  const linesRef = useRef<Record<string, ISeriesApi<"Line">>>({});
+export default function TVChart({ tickers, seriesMap }: Props) {
+  const elRef = useRef<HTMLDivElement|null>(null);
+  const chartRef = useRef<ReturnType<typeof createChart>|null>(null);
+  const linesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
 
-  // init chart once
+  // init
   useEffect(() => {
-    if (!mountRef.current || chartRef.current) return;
+    if (!elRef.current || chartRef.current) return;
 
-    const chart = createChart(mountRef.current, {
-      layout: { background: { type: ColorType.Solid, color: "#0b0b0c" }, textColor: "#a0a0a8" },
-      grid: { vertLines: { color: "#1e1e22" }, horzLines: { color: "#1e1e22" } },
+    const chart = createChart(elRef.current, {
+      height: 420,
+      layout: { background: { type: ColorType.Solid, color: "#0b0b0c" }, textColor: "#c9c9cf" },
+      grid: { vertLines: { color: "#131316" }, horzLines: { color: "#131316" } },
       rightPriceScale: { borderColor: "#1e1e22" },
-      timeScale: { borderColor: "#1e1e22" }
+      timeScale: { borderColor: "#1e1e22" },
+      crosshair: { mode: 1 },
     });
     chartRef.current = chart;
 
-    const onResize = () =>
-      chart.applyOptions({ width: mountRef.current?.clientWidth || 600, height: 460 });
-    onResize();
+    const onResize = () => {
+      if (!elRef.current || !chartRef.current) return;
+      const w = elRef.current.clientWidth;
+      chartRef.current.resize(Math.max(280, w), 420);
+    };
     window.addEventListener("resize", onResize);
+    onResize();
 
     return () => {
       window.removeEventListener("resize", onResize);
       chart.remove();
       chartRef.current = null;
-      linesRef.current = {};
+      linesRef.current.clear();
     };
   }, []);
 
-  // sync selected tickers with line series (add/remove)
+  // sync series when selection or data changes
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
 
-    // remove any series not selected
-    Object.keys(linesRef.current).forEach((key) => {
-      if (!tickers.includes(key as Ticker)) {
-        chart.removeSeries(linesRef.current[key]);
-        delete linesRef.current[key];
+    const lines = linesRef.current;
+
+    // remove series that are no longer selected
+    for (const [sym, s] of Array.from(lines.entries())) {
+      if (!tickers.includes(sym)) {
+        chart.removeSeries(s);
+        lines.delete(sym);
       }
-    });
+    }
 
-    // add missing series
-    tickers.forEach((t) => {
-      if (!linesRef.current[t]) {
-        const s = chart.addLineSeries({ color: colorFor(t), lineWidth: 2 });
-        linesRef.current[t] = s;
-
-        // if we already have data for it, set immediately
-        const data = seriesMap[t] || [];
-        if (data.length) {
-          s.setData(data.map((p) => ({ time: (p.time / 1000) as UTCTimestamp, value: p.value })));
-        }
+    // add/update each selected symbol
+    tickers.forEach((sym, idx) => {
+      let s = lines.get(sym);
+      if (!s) {
+        s = chart.addLineSeries({
+          color: colorFor(sym),
+          lineWidth: 2,
+          priceLineVisible: true,
+          priceLineStyle: LineStyle.Dotted,
+          lastValueVisible: true,
+        });
+        lines.set(sym, s);
       } else {
-        // ensure color stays in sync with palette changes
-        linesRef.current[t].applyOptions({ color: colorFor(t) });
+        s.applyOptions({ color: colorFor(sym) });
       }
+
+      const raw = seriesMap[sym] || [];
+      // convert ms -> seconds for LW charts
+      const data = raw.map(p => ({ time: Math.floor(p.time / 1000) as UTCTimestamp, value: p.value }));
+      if (data.length) s.setData(data);
     });
+
+    chart.timeScale().fitContent();
   }, [tickers, seriesMap]);
 
-  // push data whenever it updates
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-
-    tickers.forEach((t) => {
-      const s = linesRef.current[t];
-      const data = seriesMap[t] || [];
-      if (!s || !data.length) return;
-      s.setData(data.map((p) => ({ time: (p.time / 1000) as UTCTimestamp, value: p.value })));
-    });
-  }, [seriesMap, tickers]);
-
-  return <div className="h-[460px] w-full" ref={mountRef} />;
+  return <div ref={elRef} className="w-full rounded-lg overflow-hidden" />;
 }
