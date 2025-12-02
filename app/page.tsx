@@ -20,6 +20,7 @@ export default function Page(){
 
   const [gran, setGran] = useState<Gran>("1D");
   const [selected, setSelected] = useState<Ticker[]>(["SPY","QQQ","VIX","US10Y"]);
+  const [bumped, setBumped] = useState<Ticker | null>(null);
 
   const [series, setSeries] = useState<Record<string, { time:number; value:number }[]>>({});
   const [loading, setLoading] = useState<Record<string, boolean>>({});
@@ -56,8 +57,26 @@ export default function Page(){
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, gran]);
 
+  // custom toggle: if adding a new one and already at 4, replace index 3 and mark bumped
   const toggle = (t: Ticker) => {
-    setSelected(p => p.includes(t) ? p.filter(x=>x!==t) : [...p, t]);
+    setBumped(null);
+    setSelected(prev => {
+      if (prev.includes(t)) {
+        // remove it
+        return prev.filter(x => x !== t);
+      }
+      // add it
+      if (prev.length < 4) {
+        return [...prev, t];
+      } else {
+        const next = [...prev];
+        const out = next[3];
+        next[3] = t;
+        setBumped(out);
+        setTimeout(() => setBumped(null), 2000);
+        return next;
+      }
+    });
   };
 
   return (
@@ -65,7 +84,7 @@ export default function Page(){
       <header className="sticky top-0 z-20 border-b mb-4" style={{borderColor:"#1e1e22", background:"#111113"}}>
         <div className="py-3 flex items-center gap-3">
           <div className="text-xl font-semibold tracking-tight">SHORT-IT</div>
-          <div className="text-xs px-2 py-1 rounded" style={{background:"#7f1d1d"}}>Bear-mode ✦ v0.7 (Grid)</div>
+          <div className="text-xs px-2 py-1 rounded" style={{background:"#7f1d1d"}}>Bear-mode ✦ v0.8 (2×2)</div>
           <AuthHeader />
         </div>
       </header>
@@ -81,15 +100,14 @@ export default function Page(){
         </div>
       </div>
 
-      {/* Grid charts */}
+      {/* Grid charts (max 4) */}
       <div className="mb-6">
         <GridCharts
-          tickers={selected}
+          tickers={selected.slice(0,4)}
           seriesMap={series}
           loading={loading}
           errors={errors}
           height={260}
-          pageSize={4}
         />
       </div>
 
@@ -99,18 +117,23 @@ export default function Page(){
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {UNIVERSE.map(t=>{
             const active = selected.includes(t);
+            const bumpedStyle = bumped === t ? { outline: `2px solid ${colorFor(t)}`, outlineOffset: "2px" } : {};
             return (
               <button key={t}
                 onClick={()=>toggle(t)}
-                className={"px-2 py-1 rounded border text-left " + (active ? "" : "opacity-70")}
-                style={{borderColor:"#1e1e22", background: active ? colorFor(t)+"22" : "transparent", color: active ? colorFor(t) : "inherit"}}
+                className={"px-2 py-1 rounded border text-left transition " + (active ? "" : "opacity-80")}
+                style={{borderColor:"#1e1e22", background: active ? colorFor(t)+"22" : "transparent", color: active ? colorFor(t) : "inherit", ...bumpedStyle}}
               >
                 <span className="text-sm">{t}</span>
                 {active && <span className="ml-2 text-xs opacity-70">(shown)</span>}
+                {bumped === t && <span className="ml-2 text-xs" style={{ color: colorFor(t) }}>bumped</span>}
               </button>
             );
           })}
         </div>
+        {selected.length > 4 && (
+          <div className="text-xs mt-2 opacity-70">Showing first 4 charts. New selections replace slot #4.</div>
+        )}
       </div>
     </div>
   );

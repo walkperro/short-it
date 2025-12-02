@@ -1,60 +1,59 @@
-import { Gran, SourceType, dateRangeForGran } from "./sources";
+import type { Source } from "./sources";
 
-export type Pt = { time: number; value: number };
+const POLY = process.env.POLYGON_API_KEY!;
+const FRED = process.env.FRED_API_KEY!;
 
-// Polygon Aggregates (stocks + forex)
-export async function fetchPolygonAggs(ticker: string, gran: Gran): Promise<Pt[]> {
-  const key = process.env.POLYGON_API_KEY!;
-  if (!key) throw new Error("Missing POLYGON_API_KEY");
-
-  const timespan = gran === "1D" ? "day" : gran === "1W" ? "week" : "month";
-  const { fromISO, toISO } = dateRangeForGran(gran);
-
-  const url =
-    `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}` +
-    `/range/1/${timespan}/${fromISO}/${toISO}` +
-    `?adjusted=true&sort=asc&limit=50000&apiKey=${key}`;
-
-  const r = await fetch(url, { next: { revalidate: 300 }, cache: "no-store" });
-  if (!r.ok) throw new Error(`Polygon ${r.status}`);
-  const j = await r.json();
-  const rows = j?.results ?? [];
-  return rows
-    .map((row: any) => ({ time: Number(row.t), value: Number(row.c) }))
-    .filter((p) => Number.isFinite(p.value));
-}
-
-// FRED series with fallback support: "ID1|ID2|ID3"
-export async function fetchFredSeries(seriesIdList: string, _gran: Gran): Promise<Pt[]> {
-  const key = process.env.FRED_API_KEY!;
-  if (!key) throw new Error("Missing FRED_API_KEY");
-
-  const ids = seriesIdList.split("|").map(s => s.trim()).filter(Boolean);
-  const { fromISO, toISO } = dateRangeForGran("1Y"); // broad window is fine; UI syncs view
-
-  for (const id of ids) {
-    const url =
-      `https://api.stlouisfed.org/fred/series/observations?series_id=${encodeURIComponent(id)}` +
-      `&api_key=${key}&file_type=json&observation_start=${fromISO}&observation_end=${toISO}`;
-    const r = await fetch(url, { next: { revalidate: 300 }, cache: "no-store" });
-    if (!r.ok) continue; // try next id
-    const j = await r.json();
-    const obs = j?.observations ?? [];
-    const pts = obs
-      .map((o: any) => ({
-        time: new Date(o.date + "T00:00:00Z").getTime(),
-        value: o.value === "." ? NaN : Number(o.value),
-      }))
-      .filter((p: Pt) => Number.isFinite(p.value));
-    if (pts.length) return pts; // success on this id
+function dateRangeForGran(gran: string) {
+  const now = new Date();
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const start = new Date(end);
+  switch (gran) {
+    case "1D": start.setUTCFullYear(end.getUTCFullYear() - 1); break;
+    case "1W": start.setUTCFullYear(end.getUTCFullYear() - 3); break;
+    case "1M": start.setUTCFullYear(end.getUTCFullYear() - 10); break;
+    case "1Y": start.setUTCFullYear(end.getUTCFullYear() - 25); break;
+    default:   start.setUTCFullYear(end.getUTCFullYear() - 2);
   }
-
-  // nothing worked
-  return [];
+  const toISO = (d: Date) => d.toISOString().slice(0, 10);
+  return { startISO: toISO(start), endISO: toISO(end) };
 }
 
-export async function fetchTimeseries(source: SourceType, symbol: string, gran: Gran): Promise<Pt[]> {
-  if (source === "polygon-stock" || source === "polygon-forex") return fetchPolygonAggs(symbol, gran);
-  if (source === "fred") return fetchFredSeries(symbol, gran);
-  return [];
+export type Point = { time: number; value: number };
+
+async function polygonTimeseries(id: string, gran: string): Promise<Point[]> {
+  const { startISO, endISO } = dateRangeForGran(gran);
+  const url =
+    `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(id)}` +
+    `/range/1/day/${startISO}/${endISO}?adjusted=true&sort=asc&limit=50000&apiKey=${POLY}`;
+  const r = await fetch(url, { next: { revalidate: 300 } });
+  if (!r.ok) throw new Error(`Polygon ${id} ${r.status}`);
+  const j = await r.json();
+  const bars = Array.isArray(j.results) ? j.results : [];
+  return bars.map((b: any) => ({
+    time: Math.floor(Number(b.t) / 1000),   // ← seconds
+    value: Number(b.c),
+  }));
+}
+
+async function fredSeries(seriesId: string, gran: string): Promise<Point[]> {
+  const { startISO, endISO } = dateRangeForGran(gran);
+  const url =
+    `https://api.stlouisfed.org/fred/series/observations?series_id=${encodeURIComponent(seriesId)}` +
+    `&api_key=${FRED}&file_type=json&observation_start=${startISO}&observation_end=${endISO}`;
+  const r = await fetch(url, { next: { revalidate: 300 } });
+  if (!r.ok) throw new Error(`FRED ${seriesId} ${r.status}`);
+  const j = await r.json();
+  const obs = Array.isArray(j.observations) ? j.observations : [];
+  return obs
+    .filter((o: any) => o.value !== "." && o.value != null)
+    .map((o: any) => ({
+      time: Math.floor(Date.parse(o.date) / 1000),  // ← seconds
+      value: Number(o.value),
+    }));
+}
+
+export async function fetchTimeseries(src: Source, gran: string): Promise<Point[]> {
+  if (src.provider === "polygon") return polygonTimeseries(src.id, gran);
+  if (src.provider === "fred")    return fredSeries(src.id, gran);
+  throw new Error(`Unknown provider for ${JSON.stringify(src)}`);
 }
