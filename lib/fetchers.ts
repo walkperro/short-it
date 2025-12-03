@@ -3,6 +3,8 @@ import type { Source } from "./sources";
 const POLY = process.env.POLYGON_API_KEY!;
 const FRED = process.env.FRED_API_KEY!;
 
+export type Point = { time: number; value: number };
+
 function dateRangeForGran(gran: string) {
   const now = new Date();
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -14,11 +16,9 @@ function dateRangeForGran(gran: string) {
     case "1Y": start.setUTCFullYear(end.getUTCFullYear() - 25); break;
     default:   start.setUTCFullYear(end.getUTCFullYear() - 2);
   }
-  const toISO = (d: Date) => d.toISOString().slice(0, 10);
-  return { startISO: toISO(start), endISO: toISO(end) };
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { startISO: iso(start), endISO: iso(end) };
 }
-
-export type Point = { time: number; value: number };
 
 async function polygonTimeseries(id: string, gran: string): Promise<Point[]> {
   const { startISO, endISO } = dateRangeForGran(gran);
@@ -28,9 +28,9 @@ async function polygonTimeseries(id: string, gran: string): Promise<Point[]> {
   const r = await fetch(url, { next: { revalidate: 300 } });
   if (!r.ok) throw new Error(`Polygon ${id} ${r.status}`);
   const j = await r.json();
-  const bars = Array.isArray(j.results) ? j.results : [];
-  return bars.map((b: any) => ({
-    time: Math.floor(Number(b.t) / 1000),   // ← seconds
+  const rows = Array.isArray(j.results) ? j.results : [];
+  return rows.map((b: any) => ({
+    time: Math.floor(Number(b.t) / 1000), // seconds
     value: Number(b.c),
   }));
 }
@@ -47,7 +47,7 @@ async function fredSeries(seriesId: string, gran: string): Promise<Point[]> {
   return obs
     .filter((o: any) => o.value !== "." && o.value != null)
     .map((o: any) => ({
-      time: Math.floor(Date.parse(o.date) / 1000),  // ← seconds
+      time: Math.floor(Date.parse(o.date) / 1000), // seconds
       value: Number(o.value),
     }));
 }

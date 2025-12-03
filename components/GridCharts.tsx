@@ -1,77 +1,99 @@
 "use client";
-
 import { useEffect, useMemo, useRef } from "react";
-import { createChart, ColorType, LineStyle, IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
+import {
+  createChart, ColorType, LineStyle,
+  IChartApi, ISeriesApi, UTCTimestamp
+} from "lightweight-charts";
 import { colorFor } from "@/lib/palette";
 
-type Point = { time: number; value: number };
-type LoadingMap = Record<string, boolean | undefined>;
-type ErrorMap = Record<string, string | undefined>;
+type Pt = { time: number; value: number };
+type LoadMap = Record<string, boolean | undefined>;
+type ErrMap  = Record<string, string  | undefined>;
 
 export default function GridCharts({
-  tickers,
-  seriesMap,
-  loading = {},
-  errors = {},
-  height = 260,
+  tickers, seriesMap, loading = {}, errors = {}, height = 260, centerDate,
 }: {
   tickers: string[];
-  seriesMap: Record<string, Point[]>;
-  loading?: LoadingMap;
-  errors?: ErrorMap;
+  seriesMap: Record<string, Pt[]>;
+  loading?: LoadMap;
+  errors?: ErrMap;
   height?: number;
+  centerDate?: number | null; // UNIX seconds
 }) {
   const gridRef = useRef<HTMLDivElement | null>(null);
-  const chartRefs = useRef(new Map<string, IChartApi>());
-  const lineRefs  = useRef(new Map<string, ISeriesApi<"Line">>());
-  const cellRefs  = useRef(new Map<string, HTMLDivElement>());
-  const roRefs    = useRef(new Map<string, ResizeObserver>());
-  const syncing   = useRef(false);
+  const charts  = useRef(new Map<string, IChartApi>());
+  const lines   = useRef(new Map<string, ISeriesApi<"Line">>());
+  const cells   = useRef(new Map<string, HTMLDivElement>());
+  const ro      = useRef(new Map<string, ResizeObserver>());
+  const sub     = useRef(new Map<string, () => void>());
+  const syncing = useRef(false);
 
   const visible = useMemo(() => tickers.slice(0, 4), [tickers]);
 
-  const addOverlay = (cell: HTMLDivElement, key: string, styles: Partial<CSSStyleDeclaration>) => {
-    const el = document.createElement("div");
-    el.dataset[key] = "1";
-    Object.assign(el.style, {
-      position: "absolute",
-      left: "50%",
-      top: "50%",
-      transform: "translate(-50%,-50%)",
-      fontSize: "13px",
-      padding: "6px 10px",
-      borderRadius: "8px",
-      background: "rgba(0,0,0,.35)",
-      color: "#c9c9cf",
-      pointerEvents: "none",
-      opacity: "0",
-      transition: "opacity .2s",
-      ...styles,
+  const makeFullscreenBtn = (cell: HTMLDivElement) => {
+    const btn = document.createElement("button");
+    btn.textContent = "⤢";
+    btn.ariaLabel = "Fullscreen";
+    Object.assign(btn.style, {
+      position: "absolute", right: "8px", top: "8px", zIndex: "6",
+      padding: "2px 6px", borderRadius: "8px",
+      background: "#1a1a1d", color: "#c9c9cf", fontSize: "12px",
+      border: "1px solid #2a2a2e", cursor: "pointer",
     } as CSSStyleDeclaration);
-    cell.appendChild(el);
-    return el;
+    btn.onclick = () => {
+      // @ts-ignore vendor prefixes tolerated
+      (cell.requestFullscreen ||
+       cell.webkitRequestFullscreen ||
+       cell.msRequestFullscreen ||
+       cell.mozRequestFullScreen)?.call(cell);
+    };
+    return btn;
+  };
+
+  const attachSync = (id: string, c: IChartApi) => {
+    const h = () => {
+      if (syncing.current) return;
+      const r = c.timeScale().getVisibleLogicalRange();
+      if (!r) return;
+      syncing.current = true;
+      visible.forEach((sid) => {
+        if (sid === id) return;
+        const cc = charts.current.get(sid);
+        if (!cc) return;
+        try { cc.timeScale().setVisibleLogicalRange(r); } catch {}
+      });
+      requestAnimationFrame(() => { syncing.current = false; });
+    };
+    // cleanup previous if exists
+    try {
+      const prev = sub.current.get(id);
+      if (prev) c.timeScale().unsubscribeVisibleLogicalRangeChange(prev);
+    } catch {}
+    sub.current.set(id, h);
+    c.timeScale().subscribeVisibleLogicalRangeChange(h);
   };
 
   useEffect(() => {
-    const grid = gridRef.current;
-    if (!grid) return;
+    const grid = gridRef.current; if (!grid) return;
 
-    // remove stale cells
-    for (const [sym, cell] of Array.from(cellRefs.current.entries())) {
+    // remove stale panes
+    for (const [sym, cell] of Array.from(cells.current.entries())) {
       if (!visible.includes(sym)) {
-        try { roRefs.current.get(sym)?.disconnect(); } catch {}
-        roRefs.current.delete(sym);
-        try { chartRefs.current.get(sym)?.remove(); } catch {}
-        chartRefs.current.delete(sym);
-        lineRefs.current.delete(sym);
+        try { const ch = charts.current.get(sym); const h = sub.current.get(sym); if (ch && h) ch.timeScale().unsubscribeVisibleLogicalRangeChange(h); } catch {}
+        sub.current.delete(sym);
+        try { ro.current.get(sym)?.disconnect(); } catch {}
+        ro.current.delete(sym);
+        try { charts.current.get(sym)?.remove(); } catch {}
+        charts.current.delete(sym);
+        lines.current.delete(sym);
         try { cell.remove(); } catch {}
-        cellRefs.current.delete(sym);
+        cells.current.delete(sym);
       }
     }
 
-    // add new cells
+    // add new panes
     visible.forEach((sym) => {
-      if (cellRefs.current.has(sym)) return;
+      if (cells.current.has(sym)) return;
 
       const cell = document.createElement("div");
       Object.assign(cell.style, {
@@ -84,7 +106,7 @@ export default function GridCharts({
         minHeight: `${height}px`,
       });
       grid.appendChild(cell);
-      cellRefs.current.set(sym, cell);
+      cells.current.set(sym, cell);
 
       // badge
       const badge = document.createElement("div");
@@ -96,15 +118,48 @@ export default function GridCharts({
       } as CSSStyleDeclaration);
       cell.appendChild(badge);
 
-      const warn = addOverlay(cell, "warn", { background: "#2a1616", color: "#f87171", left: "unset", right: "8px", top: "6px", transform: "none" });
+      // fullscreen
+      cell.appendChild(makeFullscreenBtn(cell));
+
+      // shimmer ON by default
+      const shimmer = document.createElement("div");
+      shimmer.dataset.shimmer = "1";
+      Object.assign(shimmer.style, {
+        position: "absolute", inset: "0",
+        background: "linear-gradient(90deg, rgba(30,30,34,0) 0%, rgba(40,40,46,.7) 50%, rgba(30,30,34,0) 100%)",
+        backgroundSize: "200% 100%",
+        animation: "shortit-shimmer 1.2s infinite",
+        opacity: "1",
+        transition: "opacity .2s",
+        pointerEvents: "none",
+      } as CSSStyleDeclaration);
+      cell.appendChild(shimmer);
+
+      // no-data
+      const nod = document.createElement("div");
+      nod.dataset.nodata = "1";
+      nod.textContent = "No Data";
+      Object.assign(nod.style, {
+        position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)",
+        fontSize: "13px", padding: "6px 10px", borderRadius: "8px",
+        background: "rgba(0,0,0,.35)", color: "#c9c9cf", opacity: "0",
+        pointerEvents: "none", transition: "opacity .2s",
+      } as CSSStyleDeclaration);
+      cell.appendChild(nod);
+
+      // warn
+      const warn = document.createElement("div");
+      warn.dataset.warn = "1";
       warn.textContent = "⚠";
+      Object.assign(warn.style, {
+        position: "absolute", right: "8px", top: "6px",
+        fontSize: "12px", padding: "2px 6px", borderRadius: "8px",
+        background: "#2a1616", color: "#f87171", opacity: "0",
+        transition: "opacity .2s",
+      } as CSSStyleDeclaration);
+      cell.appendChild(warn);
 
-      const nodata = addOverlay(cell, "noData", {});
-      nodata.textContent = "No Data";
-
-      const loader = addOverlay(cell, "loading", {});
-      loader.textContent = "Loading…";
-
+      // chart
       requestAnimationFrame(() => {
         const rect = cell.getBoundingClientRect();
         const chart = createChart(cell, {
@@ -117,75 +172,100 @@ export default function GridCharts({
           crosshair: { mode: 1 },
         });
         const line = chart.addLineSeries({
-          color: colorFor(sym), lineWidth: 2,
-          priceLineVisible: true, priceLineStyle: LineStyle.Dotted,
+          color: colorFor(sym), lineWidth: 2, priceLineVisible: true, priceLineStyle: LineStyle.Dotted,
         });
+        charts.current.set(sym, chart);
+        lines.current.set(sym, line);
 
-        chartRefs.current.set(sym, chart);
-        lineRefs.current.set(sym, line);
-
-        const ro = new ResizeObserver(() => {
-          const r = cell.getBoundingClientRect();
-          chart.resize(Math.max(10, r.width), Math.max(10, height));
+        // resize
+        const robs = new ResizeObserver(() => {
+          try {
+            const rr = cell.getBoundingClientRect();
+            chart.resize(Math.max(10, rr.width), Math.max(10, height));
+          } catch {}
         });
-        ro.observe(cell);
-        roRefs.current.set(sym, ro);
+        robs.observe(cell);
+        ro.current.set(sym, robs);
+
+        // attach sync RIGHT NOW so late panes (BR) join the ring
+        attachSync(sym, chart);
       });
     });
-
-    return () => {
-      roRefs.current.forEach((r) => { try { r.disconnect(); } catch {} });
-      roRefs.current.clear();
-    };
   }, [visible, height]);
 
-  // data / overlays / force-fit
+  // data + overlays + fit + mirror initial logical range to peers
   useEffect(() => {
     visible.forEach((sym) => {
-      const chart = chartRefs.current.get(sym);
-      const line  = lineRefs.current.get(sym);
-      const cell  = cellRefs.current.get(sym);
-      if (!chart || !line || !cell) return;
+      const cell  = cells.current.get(sym);
+      const chart = charts.current.get(sym);
+      const line  = lines.current.get(sym);
+      if (!cell || !chart || !line) return;
 
-      const ldr = cell.querySelector('[data-loading="1"]') as HTMLDivElement | null;
-      const nd  = cell.querySelector('[data-noData="1"]') as HTMLDivElement | null;
-      const wn  = cell.querySelector('[data-warn="1"]') as HTMLDivElement | null;
+      const shimmer = cell.querySelector('[data-shimmer="1"]') as HTMLDivElement | null;
+      const nod     = cell.querySelector('[data-nodata="1"]')  as HTMLDivElement | null;
+      const warn    = cell.querySelector('[data-warn="1"]')    as HTMLDivElement | null;
 
-      if (ldr) ldr.style.opacity = loading[sym] ? "1" : "0";
-      if (wn)  wn.style.opacity  = errors[sym] ? "1" : "0";
+      const isDone = loading[sym] === false;
+      if (shimmer) shimmer.style.opacity = isDone ? "0" : "1";
 
-      const raw = seriesMap[sym] || [];
-      if (!raw.length) {
-        if (nd) nd.style.opacity = "1";
+      const hasErr = Boolean(errors[sym]);
+      if (warn) warn.style.opacity = hasErr ? "1" : "0";
+
+      const pts = seriesMap[sym] || [];
+      if (!pts.length && isDone) {
+        if (nod) nod.style.opacity = "1";
         try { line.setData([]); } catch {}
         return;
       }
-      if (nd) nd.style.opacity = "0";
+      if (nod) nod.style.opacity = "0";
 
-      const data = raw.map((p) => ({ time: Math.floor(p.time / 1000) as UTCTimestamp, value: p.value }));
+      const data = pts.map(p => ({ time: p.time as UTCTimestamp, value: p.value }));
       try { line.setData(data); } catch {}
 
+      // fit and then mirror to peers so all start identical
       try { chart.timeScale().fitContent(); } catch {}
-      requestAnimationFrame(() => { try { chart.timeScale().fitContent(); } catch {} });
+      requestAnimationFrame(() => {
+        try {
+          const r = chart.timeScale().getVisibleLogicalRange();
+          if (r) {
+            visible.forEach((sid) => {
+              const cc = charts.current.get(sid);
+              if (cc && cc !== chart) { try { cc.timeScale().setVisibleLogicalRange(r); } catch {} }
+            });
+          }
+        } catch {}
+      });
     });
   }, [visible, seriesMap, loading, errors]);
 
-  // sync scroll/zoom
+  // external: center all charts on a target date (keep zoom width)
   useEffect(() => {
-    const charts = visible.map((s) => chartRefs.current.get(s)).filter(Boolean) as IChartApi[];
-    const cb = (src: IChartApi) => {
-      if (syncing.current) return;
-      const r = src.timeScale().getVisibleRange();
+    if (!centerDate) return;
+    visible.forEach((sym) => {
+      const chart = charts.current.get(sym);
+      const arr   = seriesMap[sym] || [];
+      if (!chart || !arr.length) return;
+      const target = centerDate * 1000; // ms
+      // nearest index
+      let lo = 0, hi = arr.length - 1, ans = 0;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (arr[mid].time * 1000 <= target) { ans = mid; lo = mid + 1; }
+        else { hi = mid - 1; }
+      }
+      const r = chart.timeScale().getVisibleLogicalRange();
       if (!r) return;
-      syncing.current = true;
-      charts.forEach((c) => { if (c !== src) { try { c.timeScale().setVisibleRange(r); } catch {} } });
-      requestAnimationFrame(() => { syncing.current = false; });
-    };
-    charts.forEach((c) => c.timeScale().subscribeVisibleTimeRangeChange(() => cb(c)));
-    return () => charts.forEach((c) => c.timeScale().unsubscribeVisibleTimeRangeChange(() => cb(c)));
-  }, [visible]);
+      const width = r.to - r.from;
+      const mid = ans; // logical index ~ data index
+      const next = { from: mid - width / 2, to: mid + width / 2 };
+      try { chart.timeScale().setVisibleLogicalRange(next); } catch {}
+    });
+  }, [centerDate, visible.join("|")]);
 
   return (
-    <div ref={gridRef} className="grid gap-3" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }} />
+    <>
+      <style>{`@keyframes shortit-shimmer{0%{background-position:0% 0}100%{background-position:200% 0}}`}</style>
+      <div ref={gridRef} className="grid gap-3" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }} />
+    </>
   );
 }
