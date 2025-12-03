@@ -1,60 +1,37 @@
-import { Gran, SourceType, dateRangeForGran } from "./sources";
+import type { LineData } from "lightweight-charts";
+import { resolveSource } from "./sources";
 
-export type Pt = { time: number; value: number };
+const POLY = process.env.POLYGON_API_KEY!;
+const FRED = process.env.FRED_API_KEY!;
 
-// Polygon Aggregates (stocks + forex)
-export async function fetchPolygonAggs(ticker: string, gran: Gran): Promise<Pt[]> {
-  const key = process.env.POLYGON_API_KEY!;
-  if (!key) throw new Error("Missing POLYGON_API_KEY");
+export type TS = { id: string; name: string; color: string; data: LineData[] };
 
-  const timespan = gran === "1D" ? "day" : gran === "1W" ? "week" : "month";
-  const { fromISO, toISO } = dateRangeForGran(gran);
+function toISO(d: Date){ return d.toISOString().slice(0,10); }
 
-  const url =
-    `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}` +
-    `/range/1/${timespan}/${fromISO}/${toISO}` +
-    `?adjusted=true&sort=asc&limit=50000&apiKey=${key}`;
+export async function fetchTimeseriesRaw(symbol: string, gran: "1D"|"1W"|"1M"|"1Y"): Promise<TS> {
+  const src = resolveSource(symbol);
+  if (!src) throw new Error("Unknown symbol");
 
-  const r = await fetch(url, { next: { revalidate: 300 }, cache: "no-store" });
-  if (!r.ok) throw new Error(`Polygon ${r.status}`);
-  const j = await r.json();
-  const rows = j?.results ?? [];
-  return rows
-    .map((row: any) => ({ time: Number(row.t), value: Number(row.c) }))
-    .filter((p) => Number.isFinite(p.value));
-}
+  const end = new Date();
+  const start = new Date();
+  if (gran === "1Y") start.setFullYear(end.getFullYear()-10);
+  else if (gran === "1M") start.setFullYear(end.getFullYear()-3);
+  else if (gran === "1W") start.setFullYear(end.getFullYear()-2);
+  else start.setFullYear(end.getFullYear()-1);
 
-// FRED series with fallback support: "ID1|ID2|ID3"
-export async function fetchFredSeries(seriesIdList: string, _gran: Gran): Promise<Pt[]> {
-  const key = process.env.FRED_API_KEY!;
-  if (!key) throw new Error("Missing FRED_API_KEY");
-
-  const ids = seriesIdList.split("|").map(s => s.trim()).filter(Boolean);
-  const { fromISO, toISO } = dateRangeForGran("1Y"); // broad window is fine; UI syncs view
-
-  for (const id of ids) {
-    const url =
-      `https://api.stlouisfed.org/fred/series/observations?series_id=${encodeURIComponent(id)}` +
-      `&api_key=${key}&file_type=json&observation_start=${fromISO}&observation_end=${toISO}`;
-    const r = await fetch(url, { next: { revalidate: 300 }, cache: "no-store" });
-    if (!r.ok) continue; // try next id
-    const j = await r.json();
-    const obs = j?.observations ?? [];
-    const pts = obs
-      .map((o: any) => ({
-        time: new Date(o.date + "T00:00:00Z").getTime(),
-        value: o.value === "." ? NaN : Number(o.value),
-      }))
-      .filter((p: Pt) => Number.isFinite(p.value));
-    if (pts.length) return pts; // success on this id
+  if (src.kind === "polygon") {
+    const res = await fetch(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(src.ticker!)}/range/1/day/${toISO(start)}/${toISO(end)}?adjusted=true&sort=asc&limit=50000&apiKey=${POLY}`, { cache:"no-store" });
+    if (!res.ok) throw new Error("Polygon failed");
+    const j = await res.json();
+    const data: LineData[] = (j.results ?? []).map((r: any) => ({ time: Math.floor(r.t/1000), value: r.c }));
+    return { id: symbol, name: src.name, color: src.color, data };
+  } else {
+    const res = await fetch(`https://api.stlouisfed.org/fred/series/observations?series_id=${src.series}&api_key=${FRED}&file_type=json&observation_start=${toISO(start)}&observation_end=${toISO(end)}`, { cache:"no-store" });
+    if (!res.ok) throw new Error("FRED failed");
+    const j = await res.json();
+    const data: LineData[] = (j.observations ?? [])
+      .filter((o: any) => o.value !== "." && o.value !== null)
+      .map((o: any) => ({ time: Math.floor(new Date(o.date).getTime()/1000), value: Number(o.value) }));
+    return { id: symbol, name: src.name, color: src.color, data };
   }
-
-  // nothing worked
-  return [];
-}
-
-export async function fetchTimeseries(source: SourceType, symbol: string, gran: Gran): Promise<Pt[]> {
-  if (source === "polygon-stock" || source === "polygon-forex") return fetchPolygonAggs(symbol, gran);
-  if (source === "fred") return fetchFredSeries(symbol, gran);
-  return [];
 }

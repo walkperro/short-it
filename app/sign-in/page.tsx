@@ -1,105 +1,69 @@
 "use client";
-
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 
-export default function SignInPage() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [err, setErr] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
+function Banner({ kind, children }: { kind:"ok"|"warn", children: React.ReactNode }) {
+  const color = kind==="ok" ? "green" : "yellow";
+  return (
+    <div className={`mt-4 rounded-2xl border border-${color}-500/30 bg-${color}-500/10 px-4 py-3 text-sm`}>
+      <span className={`font-semibold text-${color}-300`}>{kind==="ok"?"Success":"Check your email"}</span>
+      <span className="text-zinc-300"> — {children}</span>
+    </div>
+  );
+}
 
-  async function onSignIn(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null); setOk(false);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { setErr(error.message); return; }
-    setOk(true);
-    window.location.href = "/";
-  }
+export default function SignInPage(){
+  const r = useRouter();
+  const supa = createClient();
+  const [mode, setMode] = useState<"in"|"up">("in");
+  const [email,setEmail] = useState("");
+  const [password,setPassword] = useState("");
+  const [msg,setMsg] = useState<{kind:"ok"|"warn", text:string}|null>(null);
+  const [loading,setLoading] = useState(false);
 
-  async function onSignUp(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null); setOk(false);
-
-    const redirect = typeof window !== "undefined"
-      ? `${window.location.origin}/reset`
-      : undefined;
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/` : undefined }
-    });
-
-    if (error) { setErr(error.message); return; }
-    setOk(true);
+  async function onSubmit(e: React.FormEvent){
+    e.preventDefault(); setMsg(null); setLoading(true);
+    try {
+      if (mode==="in"){
+        const { error } = await supa.auth.signInWithPassword({ email, password });
+        if (error) setMsg({kind:"warn", text:error.message});
+        else r.replace("/");
+      } else {
+        const res = await fetch("/api/auth/sign-up", {
+          method:"POST", headers:{"content-type":"application/json"},
+          body: JSON.stringify({ email, password })
+        });
+        const { error } = await res.json();
+        if (error) setMsg({kind:"warn", text:error});
+        else setMsg({kind:"warn", text:"click the SHORT-IT link to finish sign-up."});
+      }
+    } finally { setLoading(false); }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-2xl p-6 border"
-           style={{borderColor:"#1e1e22", background:"#111113"}}>
-
-        <h1 className="text-xl font-semibold mb-4">
-          {mode === "signin" ? "Sign in to SHORT-IT" : "Create your SHORT-IT account"}
-        </h1>
-
-        {mode === "signin" ? (
-          <form onSubmit={onSignIn} className="space-y-3">
-            <input type="email" required placeholder="Email" value={email}
-              onChange={(e)=>setEmail(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-transparent border"
-              style={{borderColor:"#1e1e22"}} />
-
-            <input type="password" required placeholder="Password" value={password}
-              onChange={(e)=>setPassword(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-transparent border"
-              style={{borderColor:"#1e1e22"}} />
-
-            <button className="w-full px-3 py-2 rounded border font-medium"
-              style={{borderColor:"#1e1e22"}}>Sign in</button>
-
-            <div className="text-right text-xs mt-1">
-              <a href="/reset-request" className="opacity-80 hover:opacity-100 underline">
-                Forgot password?
-              </a>
-            </div>
-
-            <div className="text-center text-sm opacity-70 mt-4">
-              Don't have an account?
-              <button type="button" onClick={()=>setMode("signup")}
-                className="underline ml-1">Sign up</button>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={onSignUp} className="space-y-3">
-            <input type="email" required placeholder="Email" value={email}
-              onChange={(e)=>setEmail(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-transparent border"
-              style={{borderColor:"#1e1e22"}} />
-
-            <input type="password" required placeholder="Password" value={password}
-              onChange={(e)=>setPassword(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-transparent border"
-              style={{borderColor:"#1e1e22"}} />
-
-            <button className="w-full px-3 py-2 rounded border font-medium"
-              style={{borderColor:"#1e1e22"}}>Sign up</button>
-
-            <div className="text-center text-sm opacity-70 mt-4">
-              Already have an account?
-              <button type="button" onClick={()=>setMode("signin")}
-                className="underline ml-1">Sign in</button>
-            </div>
-          </form>
-        )}
-
-        {err && <div className="mt-3 text-sm text-red-400">{err}</div>}
-        {ok && <div className="mt-3 text-sm text-green-400">Check your email.</div>}
+    <div className="mx-auto max-w-md p-6">
+      <h1 className="mb-4 text-2xl font-bold">SHORT-IT Account</h1>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <input required type="email" placeholder="you@email.com"
+          value={email} onChange={e=>setEmail(e.target.value)}
+          className="w-full rounded-xl bg-zinc-900/60 px-3 py-2 outline-none ring-1 ring-zinc-700 focus:ring-red-500"/>
+        <input required type="password" placeholder="password"
+          value={password} onChange={e=>setPassword(e.target.value)}
+          className="w-full rounded-xl bg-zinc-900/60 px-3 py-2 outline-none ring-1 ring-zinc-700 focus:ring-red-500"/>
+        <button disabled={loading}
+          className="w-full rounded-xl bg-red-600 px-3 py-2 font-semibold text-black disabled:opacity-50">
+          {mode==="in" ? "Sign in" : "Sign up"}
+        </button>
+      </form>
+      <div className="mt-3 text-sm text-zinc-400">
+        {mode==="in"
+          ? <>Need an account? <button className="text-red-400" onClick={()=>setMode("up")}>Sign up</button></>
+          : <>Already have an account? <button className="text-red-400" onClick={()=>setMode("in")}>Sign in</button></>}
       </div>
+      <div className="mt-2"><Link className="text-zinc-400" href="/">← Back</Link></div>
+      {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
     </div>
   );
 }
