@@ -1,0 +1,87 @@
+name: ChatGPT PR Description
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  describe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build commit summary
+        id: build
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          git fetch --depth=50 origin ${BASE} ${HEAD}
+          SUMMARY="$(git log --no-decorate --pretty=format:'- %s' ${BASE}..${HEAD} | sed 's/"/\\"/g')"
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo "$SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate description with OpenAI
+        id: gen
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          COMMITS="${{ steps.build.outputs.summary }}"
+          read -r -d '' INPUT << 'EOF' || true
+Create a concise PR description (Markdown) from the commit messages below.
+- Include a short summary, key changes, and any breaking changes or follow-ups.
+- Use bullet points.
+
+Title: ${TITLE}
+
+Commits:
+${COMMITS}
+EOF
+          RESP="$(curl -sS https://api.openai.com/v1/responses \
+            -H "Authorization: Bearer ${OPENAI_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d @- <<CURLJSON
+{
+  "model": "gpt-5.1-mini",
+  "input": ${INPUT@Q},
+  "max_output_tokens": 600
+}
+CURLJSON
+)"
+          DESC="$(python - << 'PY'
+import json, sys
+j=json.load(sys.stdin)
+print(j.get("output_text",""))
+PY
+<<< "$RESP")"
+          echo "desc<<EOF" >> $GITHUB_OUTPUT
+          echo "${DESC}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update PR body if empty
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { github, context, core } = require('@actions/github');
+            const pr = context.payload.pull_request;
+            if ((pr.body ?? '').trim().length > 0) {
+              core.info('PR already has a body; skipping update.');
+              return;
+            }
+            const body = core.getInput('body', { required: true });
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              body
+            });
+          inputs: |
+            body<<EOF
+            ${{ steps.gen.outputs.desc }}
+            EOF
