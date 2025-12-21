@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
-export const runtime = "nodejs"; // ensure server runtime
+export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(_req: NextRequest) {
   const { data, error } = await supabaseAdmin
     .from("ideas_public")
     .select("*")
