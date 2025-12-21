@@ -1,14 +1,27 @@
-import { supabase } from "@/lib/supabase/client";
 import { notFound } from "next/navigation";
 
-export default async function IdeaDetail({ params }: { params: { slug: string } }) {
-  const { data, error } = await supabase
-    .from("ideas_public")
-    .select("*")
-    .eq("slug", params.slug)
-    .single();
+export const dynamic = "force-dynamic";
 
-  if (error || !data) return notFound();
+type Idea = {
+  id: string;
+  slug: string;
+  title: string;
+  ticker: string;
+  direction: "long" | "short";
+  start_date: string;
+  end_date: string;
+  target_price: number;
+  summary: string;
+  created_at: string;
+};
+
+export default async function IdeaDetail({ params }: { params: { slug: string } }) {
+  const res = await fetch(`/api/ideas/${params.slug}`, { cache: "no-store" });
+  const json = await res.json();
+
+  if (!res.ok || !json.data) return notFound();
+
+  const data: Idea = json.data;
 
   return (
     <main className="p-6 max-w-3xl mx-auto">
