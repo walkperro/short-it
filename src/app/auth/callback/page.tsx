@@ -8,10 +8,9 @@ export default function AuthCallback() {
 
   useEffect(() => {
     (async () => {
-      // Supabase client reads tokens from URL hash automatically
       const { data, error } = await supabaseAuth.auth.getSession();
 
-      // Always clean URL
+      // Always remove the hash from the URL
       window.history.replaceState({}, document.title, "/");
 
       if (error || !data.session) {
@@ -19,7 +18,6 @@ export default function AuthCallback() {
         return;
       }
 
-      // Go somewhere deterministic
       window.location.replace("/account");
     })();
   }, []);
