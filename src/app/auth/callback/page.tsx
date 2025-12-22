@@ -7,31 +7,21 @@ export default function AuthCallback() {
   const [msg, setMsg] = useState("Signing you in...");
 
   useEffect(() => {
-    let cancelled = false;
-
     (async () => {
-      // Supabase client will read tokens from URL hash automatically.
+      // Supabase client reads tokens from URL hash automatically
       const { data, error } = await supabaseAuth.auth.getSession();
 
-      if (cancelled) return;
+      // Always clean URL
+      window.history.replaceState({}, document.title, "/");
 
       if (error || !data.session) {
-        setMsg("Could not complete sign-in. Please try again.");
-        // Clean URL anyway
-        window.history.replaceState({}, document.title, "/login");
+        setMsg("Sign-in failed or link expired. Please request a new magic link.");
         return;
       }
 
-      // ✅ Clean the URL (removes #access_token…)
-      window.history.replaceState({}, document.title, "/");
-
-      // Optional: force a refresh so server components reflect auth later
+      // Go somewhere deterministic
       window.location.replace("/account");
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   return (
