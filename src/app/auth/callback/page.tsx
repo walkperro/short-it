@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { supabaseAuth } from "@/lib/supabase/auth-client";
 
@@ -9,7 +10,7 @@ export default function AuthCallback() {
     (async () => {
       const { data, error } = await supabaseAuth.auth.getSession();
 
-      // remove #access_token / #error from URL
+      // Always strip hash (#access_token / #error)
       window.history.replaceState({}, document.title, "/");
 
       if (error || !data.session) {
