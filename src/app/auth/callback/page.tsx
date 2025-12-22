@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { supabaseAuth } from "@/lib/supabase/auth-client";
 
@@ -10,11 +9,11 @@ export default function AuthCallback() {
     (async () => {
       const { data, error } = await supabaseAuth.auth.getSession();
 
-      // Always remove the hash from the URL
+      // remove #access_token / #error from URL
       window.history.replaceState({}, document.title, "/");
 
       if (error || !data.session) {
-        setMsg("Sign-in failed or link expired. Please request a new magic link.");
+        setMsg("Sign-in failed or link expired. Request a new magic link.");
         return;
       }
 
