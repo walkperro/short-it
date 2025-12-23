@@ -4,17 +4,25 @@ import { useEffect, useState } from "react";
 import { supabaseAuth } from "@/lib/supabase/auth-client";
 
 export default function AuthCallback() {
-  const [msg, setMsg] = useState("Signing you in...");
+  const [msg, setMsg] = useState("Completing sign-in...");
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabaseAuth.auth.getSession();
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
 
-      // Always strip hash (#access_token / #error)
+      if (!code) {
+        setMsg("No auth code found. Please request a new magic link.");
+        return;
+      }
+
+      const { error } = await supabaseAuth.auth.exchangeCodeForSession(code);
+
+      // Clean URL
       window.history.replaceState({}, document.title, "/");
 
-      if (error || !data.session) {
-        setMsg("Sign-in failed or link expired. Request a new magic link.");
+      if (error) {
+        setMsg("Sign-in failed. Please request a new magic link.");
         return;
       }
 
