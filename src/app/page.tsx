@@ -43,3 +43,15 @@ export default function Home() {
     </main>
   );
 }
+
+/* --- Pricing context --- */
+{/* 
+<div className="mt-10 grid gap-3 rounded-2xl border p-5">
+  <div className="text-sm font-medium">Access Levels</div>
+  <ul className="text-sm text-black/70 space-y-1">
+    <li><strong>LEVEL I — Ideas:</strong> What to trade.</li>
+    <li><strong>LEVEL II — Conviction:</strong> Why it should work.</li>
+    <li><strong>LEVEL III — Macro:</strong> Why now, and why this sector.</li>
+  </ul>
+</div>
+*/}
