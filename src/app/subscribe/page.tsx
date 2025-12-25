@@ -11,28 +11,26 @@ export default function SubscribePage() {
     <main className="p-6 max-w-3xl mx-auto">
       <h1 className="text-2xl font-semibold">Subscribe</h1>
       <p className="mt-2 text-sm text-black/70">
-        Start with ideas. Upgrade when you want conviction and macro context.
+        Choose your access level. Upgrade anytime.
       </p>
 
       <div className="mt-6 grid gap-4">
-        <TierCard
+        <Tier
           title="Ideas (LEVEL I)"
           price="$29.99 / month"
-          desc="3–4 curated trade ideas per month with defined targets and timeframes."
+          desc="3–4 curated trade ideas with targets and timeframes."
           href={STRIPE_LINKS.ideas}
         />
-
-        <TierCard
+        <Tier
           title="Conviction (LEVEL II)"
           price="$79.99 / month"
-          desc="Full technical and fundamental thesis behind each idea."
+          desc="Technical and fundamental reasoning behind each idea."
           href={STRIPE_LINKS.conviction}
         />
-
-        <TierCard
+        <Tier
           title="Macro (LEVEL III)"
           price="$199.99 / month"
-          desc="Macro regime, sector allocation, and multi-quarter outlook."
+          desc="Macro regime, sector allocation, and cycle-level context."
           href={STRIPE_LINKS.macro}
         />
       </div>
@@ -44,26 +42,14 @@ export default function SubscribePage() {
   );
 }
 
-function TierCard({
-  title,
-  price,
-  desc,
-  href,
-}: {
-  title: string;
-  price: string;
-  desc: string;
-  href: string;
-}) {
+function Tier({ title, price, desc, href }: any) {
   return (
     <div className="rounded-2xl border p-5">
       <div className="flex items-center justify-between">
         <div className="text-lg font-semibold">{title}</div>
         <div className="text-sm text-black/60">{price}</div>
       </div>
-
       <p className="mt-2 text-sm text-black/70">{desc}</p>
-
       <a
         href={href}
         target="_blank"
