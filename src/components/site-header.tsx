@@ -26,9 +26,7 @@ export function SiteHeader() {
         <div className="ml-2 flex items-center gap-3">
           {!loading && user?.email ? (
             <>
-              <span className="max-w-[140px] truncate text-xs text-white/60">
-                {user.email}
-              </span>
+              <span className="max-w-[140px] truncate text-xs text-white/60">{user.email}</span>
               <button
                 onClick={() => signOut()}
                 className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black"
