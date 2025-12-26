@@ -11,7 +11,7 @@ function tierFromPriceId(priceId: string): Tier | null {
   if (priceId === process.env.STRIPE_PRICE_IDEAS) return "ideas";
   if (priceId === process.env.STRIPE_PRICE_CONVICTION) return "conviction";
   if (priceId === process.env.STRIPE_PRICE_MACRO) return "macro";
-  return undefined;
+  return null;
 }
 
 async function userIdFromCustomerId(customerId: string): Promise<string | undefined> {
@@ -22,7 +22,7 @@ async function userIdFromCustomerId(customerId: string): Promise<string | undefi
     .maybeSingle();
 
   if (error) return undefined;
-  return (data?.id as string) ?? null;
+  return (data?.id as string) ?? undefined;
 }
 
 async function applyPlan(args: {
@@ -37,7 +37,7 @@ async function applyPlan(args: {
     .from("profiles")
     .update({
       plan,
-      stripe_customer_id: customerId ?? undefined,
+      stripe_customer_id: customerId ?? null,
       stripe_subscription_id: subscriptionId ?? null,
     })
     .eq("id", userId);
