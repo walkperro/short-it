@@ -19,14 +19,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (!alive) return;
-      setUser(data.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (!alive) return;
+        setUser(data.user ?? null);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setUser(null);
+        setLoading(false);
+      });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      // session null means signed out
       setUser(session?.user ?? null);
       setLoading(false);
     });
@@ -39,13 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     await supabase.auth.signOut();
+    // immediately reflect sign out in UI
+    setUser(null);
   }
 
-  return (
-    <Ctx.Provider value={{ user, loading, signOut }}>
-      {children}
-    </Ctx.Provider>
-  );
+  return <Ctx.Provider value={{ user, loading, signOut }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {
