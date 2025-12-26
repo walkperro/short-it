@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Profile lookup failed" }, { status: 500 });
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || getRequestBaseUrl();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (await getRequestBaseUrl());
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
