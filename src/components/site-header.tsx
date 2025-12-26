@@ -1,10 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 export function SiteHeader() {
   const { user, loading, signOut } = useAuth();
+  const router = useRouter();
+
+  async function handleSignOut() {
+    await signOut();
+    router.push("/");
+    router.refresh();
+  }
 
   return (
     <header className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 text-white">
@@ -26,9 +34,11 @@ export function SiteHeader() {
         <div className="ml-2 flex items-center gap-3">
           {!loading && user?.email ? (
             <>
-              <span className="max-w-[140px] truncate text-xs text-white/60">{user.email}</span>
+              <span className="max-w-[140px] truncate text-xs text-white/60">
+                {user.email}
+              </span>
               <button
-                onClick={() => signOut()}
+                onClick={handleSignOut}
                 className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black"
               >
                 Sign out
