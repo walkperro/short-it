@@ -15,21 +15,17 @@ function planRank(plan: Plan) {
 export async function GET(_req: NextRequest, ctx: { params: { slug: string } }) {
   const slug = ctx.params.slug;
 
-  // Always start with public fields
+  // Public-safe fields
   const { data: base, error: baseErr } = await supabaseAdmin
     .from("ideas_public")
     .select("*")
     .eq("slug", slug)
     .maybeSingle();
 
-  if (baseErr) {
-    return NextResponse.json({ error: baseErr.message }, { status: 500 });
-  }
-  if (!base) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  if (baseErr) return NextResponse.json({ error: baseErr.message }, { status: 500 });
+  if (!base) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Determine user's plan via server session cookie
+  // Determine user plan via cookie session
   let plan: Plan = "free";
   const supabase = createSupabaseServerClient();
   const { data: userRes } = await supabase.auth.getUser();
@@ -45,26 +41,26 @@ export async function GET(_req: NextRequest, ctx: { params: { slug: string } }) 
     plan = (profile?.plan as Plan) ?? "free";
   }
 
-  // If plan doesn't allow extras, return base only
-  if (planRank(plan) < 2) {
+  // Pull gated fields from private table only if needed
+  const wantIdeas = planRank(plan) >= 1;
+  const wantConviction = planRank(plan) >= 2;
+  const wantMacro = planRank(plan) >= 3;
+
+  if (!wantIdeas && !wantConviction && !wantMacro) {
     return NextResponse.json({ data: { ...base, plan } });
   }
 
-  // Fetch gated fields from the private table
-  const { data: full, error: fullErr } = await supabaseAdmin
+  const { data: full } = await supabaseAdmin
     .from("ideas")
-    .select("conviction, macro_context")
+    .select("summary, conviction, macro_context")
     .eq("slug", slug)
     .maybeSingle();
 
-  if (fullErr) {
-    return NextResponse.json({ data: { ...base, plan } });
-  }
-
   const payload: any = { ...base, plan };
 
-  if (planRank(plan) >= 2) payload.conviction = full?.conviction ?? null;
-  if (planRank(plan) >= 3) payload.macro_context = full?.macro_context ?? null;
+  if (wantIdeas) payload.summary = full?.summary ?? null;
+  if (wantConviction) payload.conviction = full?.conviction ?? null;
+  if (wantMacro) payload.macro_context = full?.macro_context ?? null;
 
   return NextResponse.json({ data: payload });
 }

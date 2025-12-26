@@ -14,14 +14,22 @@ type Idea = {
   start_date: string;
   end_date: string;
   target_price: number;
-  summary: string;
+  teaser?: string | null;
   created_at: string;
+  published_at?: string | null;
 
-  // returned only when allowed
   plan?: Plan;
-  conviction?: string | null;
-  macro_context?: string | null;
+  summary?: string | null; // Level I+
+  conviction?: string | null; // Level II+
+  macro_context?: string | null; // Level III+
 };
+
+function planRank(plan: Plan) {
+  if (plan === "macro") return 3;
+  if (plan === "conviction") return 2;
+  if (plan === "ideas") return 1;
+  return 0;
+}
 
 function planLabel(plan: Plan) {
   if (plan === "macro") return "LEVEL III — MACRO";
@@ -30,16 +38,22 @@ function planLabel(plan: Plan) {
   return "FREE";
 }
 
+function fmt(ts?: string | null) {
+  if (!ts) return null;
+  const d = new Date(ts);
+  return d.toLocaleString();
+}
+
 export default async function IdeaDetail({ params }: { params: { slug: string } }) {
   const baseUrl = getRequestBaseUrl();
-
   const res = await fetch(`${baseUrl}/api/ideas/${params.slug}`, { cache: "no-store" });
   const json = await res.json().catch(() => ({}));
-
   if (!res.ok || !json.data) return notFound();
-  const data: Idea = json.data;
 
+  const data: Idea = json.data;
   const plan: Plan = (data.plan as Plan) ?? "free";
+
+  const hasSummary = !!data.summary;
   const hasConviction = !!data.conviction;
   const hasMacro = !!data.macro_context;
 
@@ -51,8 +65,14 @@ export default async function IdeaDetail({ params }: { params: { slug: string } 
           <div className="text-sm text-white/70 mt-1">
             {data.ticker} · {data.direction.toUpperCase()} · Target {data.target_price}
           </div>
-          <div className="mt-2 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
-            {planLabel(plan)}
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
+              {planLabel(plan)}
+            </div>
+            <div className="text-xs text-white/50">
+              Posted: {fmt(data.published_at ?? data.created_at) ?? fmt(data.created_at)}
+            </div>
           </div>
         </div>
 
@@ -64,12 +84,40 @@ export default async function IdeaDetail({ params }: { params: { slug: string } 
         </a>
       </div>
 
+      {/* Teaser always */}
       <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-        <h2 className="font-medium">Summary</h2>
-        <p className="mt-2 text-sm text-white/80">{data.summary}</p>
+        <h2 className="font-medium">Teaser</h2>
+        <p className="mt-2 text-sm text-white/80 whitespace-pre-wrap">
+          {data.teaser ?? "—"}
+        </p>
       </section>
 
-      {/* Conviction */}
+      {/* Summary (Level I+) */}
+      <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-medium">Idea Thesis</h3>
+          {!hasSummary ? (
+            <span className="text-xs text-white/60">Locked · LEVEL I+</span>
+          ) : (
+            <span className="text-xs text-white/60">Unlocked</span>
+          )}
+        </div>
+
+        {hasSummary ? (
+          <p className="mt-2 text-sm text-white/80 whitespace-pre-wrap">{data.summary}</p>
+        ) : (
+          <div className="mt-2 text-sm text-white/70">
+            Subscribe to <span className="text-white">Ideas (LEVEL I)</span> to read the full thesis.
+            <div className="mt-3">
+              <a className="inline-flex rounded-2xl border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/5" href="/subscribe">
+                Unlock LEVEL I
+              </a>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Conviction (Level II+) */}
       <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-medium">Conviction</h3>
@@ -84,20 +132,17 @@ export default async function IdeaDetail({ params }: { params: { slug: string } 
           <p className="mt-2 text-sm text-white/80 whitespace-pre-wrap">{data.conviction}</p>
         ) : (
           <div className="mt-2 text-sm text-white/70">
-            Upgrade to <span className="text-white">Conviction</span> to see the technical + fundamental thesis.
+            Upgrade to <span className="text-white">Conviction</span> to see the technical + fundamental reasoning.
             <div className="mt-3">
-              <a
-                href="/subscribe"
-                className="inline-flex rounded-2xl border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/5"
-              >
-                Unlock Conviction
+              <a className="inline-flex rounded-2xl border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/5" href="/subscribe">
+                Unlock LEVEL II
               </a>
             </div>
           </div>
         )}
       </section>
 
-      {/* Macro */}
+      {/* Macro (Level III) */}
       <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-medium">Macro</h3>
@@ -112,13 +157,10 @@ export default async function IdeaDetail({ params }: { params: { slug: string } 
           <p className="mt-2 text-sm text-white/80 whitespace-pre-wrap">{data.macro_context}</p>
         ) : (
           <div className="mt-2 text-sm text-white/70">
-            Upgrade to <span className="text-white">Macro</span> to see the regime view (rates, spreads, flows, geopolitics).
+            Upgrade to <span className="text-white">Macro</span> for the full regime view.
             <div className="mt-3">
-              <a
-                href="/subscribe"
-                className="inline-flex rounded-2xl border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/5"
-              >
-                Unlock Macro
+              <a className="inline-flex rounded-2xl border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/5" href="/subscribe">
+                Unlock LEVEL III
               </a>
             </div>
           </div>

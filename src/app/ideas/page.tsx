@@ -11,9 +11,15 @@ type Idea = {
   start_date: string;
   end_date: string;
   target_price: number;
-  summary: string;
+  teaser: string | null;
   created_at: string;
+  published_at: string | null;
 };
+
+function fmt(ts?: string | null) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString();
+}
 
 export default async function IdeasPage() {
   const baseUrl = getRequestBaseUrl();
@@ -31,7 +37,7 @@ export default async function IdeasPage() {
     <main className="p-6 max-w-3xl mx-auto text-white">
       <h1 className="text-2xl font-semibold">Ideas</h1>
       <p className="text-sm text-white/70 mt-1">
-        3–4 ideas per month. Upgrade to unlock Conviction + Macro.
+        Public sees the teaser. LEVEL I unlocks the full thesis.
       </p>
 
       <div className="mt-6 grid gap-4">
@@ -48,11 +54,17 @@ export default async function IdeasPage() {
               </div>
             </div>
 
-            <div className="mt-2 text-sm text-white/70">
-              Target: {idea.target_price} · {idea.start_date} → {idea.end_date}
+            <div className="mt-2 text-sm text-white/70 flex flex-wrap gap-x-3 gap-y-1">
+              <span>Target: {idea.target_price}</span>
+              <span>·</span>
+              <span>{idea.start_date} → {idea.end_date}</span>
+              <span>·</span>
+              <span>Posted: {fmt(idea.published_at ?? idea.created_at)}</span>
             </div>
 
-            <div className="mt-3 text-sm text-white/80">{idea.summary}</div>
+            <div className="mt-3 text-sm text-white/80 whitespace-pre-wrap">
+              {idea.teaser ?? "—"}
+            </div>
           </a>
         ))}
       </div>
