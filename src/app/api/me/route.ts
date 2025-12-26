@@ -5,22 +5,22 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const supabase = createSupabaseServerClient();
+  const { data } = await supabase.auth.getUser();
 
-  const { data: userRes, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !userRes.user) {
-    return NextResponse.json({ user: null, plan: "free" });
+  const user = data.user;
+  if (!user) {
+    return NextResponse.json({ user: null, plan: "free", is_admin: false });
   }
-
-  const userId = userRes.user.id;
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("plan")
-    .eq("id", userId)
+    .select("plan,is_admin,email")
+    .eq("id", user.id)
     .maybeSingle();
 
   return NextResponse.json({
-    user: { id: userId, email: userRes.user.email ?? null },
+    user: { id: user.id, email: user.email },
     plan: profile?.plan ?? "free",
+    is_admin: !!profile?.is_admin,
   });
 }

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
-import { createServerClient, createClient } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 
 export function createSupabaseServerClient() {
   const cookieStore = cookies();
@@ -13,21 +14,18 @@ export function createSupabaseServerClient() {
       },
       setAll(cookiesToSet) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
         } catch {
-          // ignore if called from a server component without mutating cookies
+          // ignore if called from a server component without cookie mutation support
         }
       },
     },
   });
 }
 
-// Server-only admin client (Service Role) for webhooks / billing portal updates.
-// IMPORTANT: Never expose SUPABASE_SERVICE_ROLE_KEY to the client.
-export const supabaseAdmin = (() => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(url, serviceRole);
-})();
+// Admin client for server-side DB ops (webhooks, gated reads, admin APIs)
+export const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { persistSession: false } }
+);

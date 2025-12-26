@@ -1,6 +1,6 @@
-export const dynamic = "force-dynamic";
-
 import { getRequestBaseUrl } from "@/lib/server-url";
+
+export const dynamic = "force-dynamic";
 
 type Idea = {
   id: string;
@@ -23,13 +23,10 @@ function fmt(ts?: string | null) {
 
 export default async function IdeasPage() {
   const baseUrl = getRequestBaseUrl();
-
   const res = await fetch(`${baseUrl}/api/ideas`, { cache: "no-store" });
   const json = await res.json().catch(() => ({}));
 
-  if (!res.ok) {
-    return <div className="p-6 text-white">Error: {json.error ?? "Failed to load ideas"}</div>;
-  }
+  if (!res.ok) return <div className="p-6 text-white">Error: {json.error ?? "Failed to load ideas"}</div>;
 
   const ideas: Idea[] = json.data ?? [];
 
@@ -62,9 +59,7 @@ export default async function IdeasPage() {
               <span>Posted: {fmt(idea.published_at ?? idea.created_at)}</span>
             </div>
 
-            <div className="mt-3 text-sm text-white/80 whitespace-pre-wrap">
-              {idea.teaser ?? "—"}
-            </div>
+            <div className="mt-3 text-sm text-white/80 whitespace-pre-wrap">{idea.teaser ?? "—"}</div>
           </a>
         ))}
       </div>
