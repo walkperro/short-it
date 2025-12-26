@@ -7,7 +7,7 @@ async function requireAdmin() {
   const supabase = createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
   const user = data.user;
-  if (!user) return { ok: false as const, error: "Not signed in" };
+  if (!user) return { ok: false as const, status: 401, error: "Not signed in" };
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
@@ -15,21 +15,13 @@ async function requireAdmin() {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile?.is_admin) return { ok: false as const, error: "Not authorized" };
+  if (!profile?.is_admin) return { ok: false as const, status: 403, error: "Not authorized" };
   return { ok: true as const, userId: user.id };
-}
-
-function slugify(s: string) {
-  return s
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
 }
 
 export async function GET() {
   const auth = await requireAdmin();
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: 401 });
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { data, error } = await supabaseAdmin
     .from("ideas")
@@ -42,42 +34,25 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin();
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: 401 });
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const body = await req.json().catch(() => ({}));
-  const title = (body.title ?? "").toString().trim();
-  const ticker = (body.ticker ?? "").toString().trim().toUpperCase();
-  const direction = (body.direction ?? "long").toString();
-  const start_date = (body.start_date ?? "").toString();
-  const end_date = (body.end_date ?? "").toString();
-  const target_price = Number(body.target_price ?? 0);
-  const teaser = (body.teaser ?? "").toString();
-  const summary = (body.summary ?? "").toString();
-  const conviction = (body.conviction ?? "").toString();
-  const macro_context = (body.macro_context ?? "").toString();
-  const status = (body.status ?? "draft").toString();
-
-  if (!title || !ticker || !start_date || !end_date || !target_price) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-  }
-
-  const slug = body.slug ? String(body.slug) : slugify(`${ticker}-${title}`);
 
   const payload: any = {
-    slug,
-    title,
-    ticker,
-    direction,
-    start_date,
-    end_date,
-    target_price,
-    teaser,
-    summary,
-    conviction,
-    macro_context,
-    status,
+    slug: body.slug,
+    title: body.title,
+    ticker: String(body.ticker ?? "").toUpperCase(),
+    direction: body.direction ?? "long",
+    start_date: body.start_date,
+    end_date: body.end_date,
+    target_price: Number(body.target_price),
+    teaser: body.teaser ?? null,
+    summary: body.summary ?? null,
+    conviction: body.conviction ?? null,
+    macro_context: body.macro_context ?? null,
+    status: body.status ?? "draft",
     author_id: auth.userId,
-    published_at: status === "published" ? new Date().toISOString() : null,
+    published_at: body.status === "published" ? new Date().toISOString() : null,
   };
 
   const { data, error } = await supabaseAdmin.from("ideas").insert(payload).select("*").single();
