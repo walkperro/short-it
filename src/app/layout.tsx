@@ -1,3 +1,4 @@
+import SiteHeader from "@/components/SiteHeader";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -27,7 +28,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        
+        {/* Site header */}
+        <SiteHeader />
+{children}
       </body>
     </html>
   );

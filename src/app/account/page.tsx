@@ -1,56 +1,91 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabaseAuth } from "@/lib/supabase/auth-client";
 
+type Profile = {
+  plan: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  email?: string | null;
+};
+
 export default function AccountPage() {
   const [email, setEmail] = useState<string | null>(null);
-  const [plan, setPlan] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      const { data: s } = await supabaseAuth.auth.getSession();
-      const user = s.session?.user;
-      setEmail(user?.email ?? null);
+      const { data } = await supabaseAuth.auth.getSession();
+      const user = data.session?.user ?? null;
 
-      if (!user) return;
+      if (!user) {
+        setEmail(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
 
-      const { data, error } = await supabaseAuth
+      setEmail(user.email ?? null);
+
+      // Read profile (RLS policy allows user to read own row)
+      const { data: p } = await supabaseAuth
         .from("profiles")
-        .select("plan")
+        .select("plan,stripe_customer_id,stripe_subscription_id")
         .eq("id", user.id)
         .single();
 
-      if (error) setErr(error.message);
-      else setPlan(data?.plan ?? null);
+      setProfile(p ?? null);
+      setLoading(false);
     })();
   }, []);
 
-  async function signOut() {
-    await supabaseAuth.auth.signOut();
-    window.location.replace("/");
-  }
-
   return (
-    <main className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-semibold">Account</h1>
-      <p className="mt-2 text-sm text-black/70">Signed in as: {email ?? "Not signed in"}</p>
+    <main className="p-6 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-semibold text-white">Account</h1>
 
-      {err && <div className="mt-4 rounded-2xl border p-4 text-sm">Error: {err}</div>}
+      {loading ? (
+        <p className="mt-4 text-sm text-white/60">Loading…</p>
+      ) : !email ? (
+        <div className="mt-4 rounded-2xl border border-white/10 p-5">
+          <p className="text-sm text-white/70">You’re not logged in.</p>
+          <Link
+            href="/login"
+            className="inline-block mt-4 rounded-full bg-white text-black px-4 py-2 text-sm"
+          >
+            Log in
+          </Link>
+        </div>
+      ) : (
+        <div className="mt-4 rounded-2xl border border-white/10 p-5">
+          <div className="text-sm text-white/70">Signed in as</div>
+          <div className="mt-1 text-base text-white">{email}</div>
 
-      {plan && (
-        <div className="mt-4 rounded-2xl border p-4 text-sm">
-          <span className="font-medium">Plan:</span> {plan}
+          <div className="mt-4 grid gap-2 text-sm text-white/75">
+            <div>
+              <span className="text-white/50">Plan:</span>{" "}
+              <span className="text-white">{profile?.plan ?? "free"}</span>
+            </div>
+            <div>
+              <span className="text-white/50">Stripe Customer:</span>{" "}
+              <span className="text-white/70">{profile?.stripe_customer_id ?? "—"}</span>
+            </div>
+            <div>
+              <span className="text-white/50">Stripe Subscription:</span>{" "}
+              <span className="text-white/70">{profile?.stripe_subscription_id ?? "—"}</span>
+            </div>
+          </div>
+
+          <Link
+            href="/subscribe"
+            className="inline-block mt-5 rounded-full border border-white/15 px-4 py-2 text-sm text-white/85"
+          >
+            Manage subscription
+          </Link>
         </div>
       )}
-
-      <div className="mt-6 flex gap-3">
-        <a href="/ideas" className="rounded-2xl border px-4 py-2 text-sm">Ideas</a>
-        <button onClick={signOut} className="rounded-2xl bg-black text-white px-4 py-2 text-sm">
-          Sign out
-        </button>
-      </div>
     </main>
   );
 }
