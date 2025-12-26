@@ -5,32 +5,47 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-function tierFromPriceId(priceId: string): "ideas" | "conviction" | "macro" | null {
+type Tier = "ideas" | "conviction" | "macro";
+
+function tierFromPriceId(priceId: string): Tier | null {
   if (priceId === process.env.STRIPE_PRICE_IDEAS) return "ideas";
   if (priceId === process.env.STRIPE_PRICE_CONVICTION) return "conviction";
   if (priceId === process.env.STRIPE_PRICE_MACRO) return "macro";
   return null;
 }
 
-async function applySubscriptionToUser(args: {
+async function userIdFromCustomerId(customerId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
+  if (error) return null;
+  return (data?.id as string) ?? null;
+}
+
+async function applyPlan(args: {
   userId: string;
+  plan: Tier | "free";
   customerId?: string | null;
   subscriptionId?: string | null;
-  priceId?: string | null;
 }) {
-  const { userId, customerId, subscriptionId, priceId } = args;
-
-  const plan = priceId ? tierFromPriceId(priceId) : null;
-  if (!plan) return;
+  const { userId, plan, customerId, subscriptionId } = args;
 
   await supabaseAdmin
     .from("profiles")
     .update({
       plan,
-      stripe_customer_id: customerId ?? null,
+      stripe_customer_id: customerId ?? undefined,
       stripe_subscription_id: subscriptionId ?? null,
     })
     .eq("id", userId);
+}
+
+async function getPriceIdFromSubscription(sub: Stripe.Subscription): Promise<string | null> {
+  const priceId = sub.items.data?.[0]?.price?.id ?? null;
+  return priceId;
 }
 
 export async function POST(req: Request) {
@@ -38,7 +53,10 @@ export async function POST(req: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!sig || !secret) {
-    return NextResponse.json({ error: "Missing stripe-signature or STRIPE_WEBHOOK_SECRET" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing stripe-signature or STRIPE_WEBHOOK_SECRET" },
+      { status: 400 }
+    );
   }
 
   const body = await req.text();
@@ -47,12 +65,16 @@ export async function POST(req: Request) {
   try {
     event = stripe.webhooks.constructEvent(body, sig, secret);
   } catch (err: any) {
-    return NextResponse.json({ error: `Webhook signature failed: ${err.message}` }, { status: 400 });
+    return NextResponse.json(
+      { error: `Webhook signature failed: ${err.message}` },
+      { status: 400 }
+    );
   }
 
-  // Primary: checkout session completed (reliable metadata)
+  // ---- 1) checkout.session.completed (best place to map userId) ----
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
+
     const userId = (session.metadata as any)?.userId as string | undefined;
     if (!userId) return NextResponse.json({ received: true });
 
@@ -61,46 +83,67 @@ export async function POST(req: Request) {
 
     let priceId: string | null = null;
     if (subscriptionId) {
-      const sub = await stripe.subscriptions.retrieve(subscriptionId, { expand: ["items.data.price"] });
+      const sub = await stripe.subscriptions.retrieve(subscriptionId, {
+        expand: ["items.data.price"],
+      });
       priceId = sub.items.data?.[0]?.price?.id ?? null;
     }
 
-    await applySubscriptionToUser({ userId, customerId, subscriptionId, priceId });
+    if (priceId) {
+      const plan = tierFromPriceId(priceId);
+      if (plan) {
+        await applyPlan({ userId, plan, customerId, subscriptionId });
+      }
+    }
+
     return NextResponse.json({ received: true });
   }
 
-  // Subscription updates/cancels
-  if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created") {
+  // ---- 2) subscription created/updated (may not include metadata) ----
+  if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated") {
     const sub = event.data.object as Stripe.Subscription;
-
-    // We don't always have metadata here depending on how it was created.
-    // If you want this to work 100% for these events, you must ensure subscription metadata is set.
-    // For now, we only act if metadata.userId exists.
-    const userId = (sub.metadata as any)?.userId as string | undefined;
-    if (!userId) return NextResponse.json({ received: true });
 
     const customerId = typeof sub.customer === "string" ? sub.customer : null;
-    const subscriptionId = sub.id;
-    const priceId = sub.items.data?.[0]?.price?.id ?? null;
+    if (!customerId) return NextResponse.json({ received: true });
 
-    await applySubscriptionToUser({ userId, customerId, subscriptionId, priceId });
+    let userId = (sub.metadata as any)?.userId as string | undefined;
+    if (!userId) {
+      userId = await userIdFromCustomerId(customerId);
+    }
+    if (!userId) return NextResponse.json({ received: true });
+
+    const subscriptionId = sub.id;
+    const priceId = await getPriceIdFromSubscription(sub);
+
+    if (priceId) {
+      const plan = tierFromPriceId(priceId);
+      if (plan) {
+        await applyPlan({ userId, plan, customerId, subscriptionId });
+      }
+    }
+
     return NextResponse.json({ received: true });
   }
 
+  // ---- 3) subscription deleted (downgrade to free) ----
   if (event.type === "customer.subscription.deleted") {
     const sub = event.data.object as Stripe.Subscription;
-    const userId = (sub.metadata as any)?.userId as string | undefined;
 
-    // If we don't have userId metadata, we can't map it safely.
+    const customerId = typeof sub.customer === "string" ? sub.customer : null;
+    if (!customerId) return NextResponse.json({ received: true });
+
+    let userId = (sub.metadata as any)?.userId as string | undefined;
+    if (!userId) {
+      userId = await userIdFromCustomerId(customerId);
+    }
     if (!userId) return NextResponse.json({ received: true });
 
-    await supabaseAdmin
-      .from("profiles")
-      .update({
-        plan: "free",
-        stripe_subscription_id: null,
-      })
-      .eq("id", userId);
+    await applyPlan({
+      userId,
+      plan: "free",
+      customerId,
+      subscriptionId: null,
+    });
 
     return NextResponse.json({ received: true });
   }
