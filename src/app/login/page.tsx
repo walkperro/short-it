@@ -1,135 +1,163 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabaseAuth } from "@/lib/supabase/auth-client";
-
-function siteUrl() {
-  const env = process.env.NEXT_PUBLIC_SITE_URL;
-  if (env) return env.replace(/\/+$/, "");
-  if (typeof window !== "undefined") return window.location.origin;
-  return "https://short-it.trade";
-}
+import { getSiteUrl } from "@/lib/site-url";
 
 export default function LoginPage() {
-  const redirectTo = useMemo(() => `${siteUrl()}/auth/callback`, []);
+  const sp = useSearchParams();
+  const next = sp.get("next") || "/account";
+
+  const siteUrl = useMemo(() => getSiteUrl(), []);
+  const redirectTo = `${siteUrl}/auth/callback?next=${encodeURIComponent(next)}`;
+
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabaseAuth.auth.getSession();
-      if (data.session) window.location.href = "/account";
-    })();
-  }, []);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  async function signInWithGoogle() {
-    setErr(null); setMsg(null);
-    const { error } = await supabaseAuth.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo }
+  async function signInPassword() {
+    setBusy(true); setError(null); setStatus(null);
+    const { error } = await supabaseAuth.auth.signInWithPassword({ email, password });
+    setBusy(false);
+
+    if (error) return setError(error.message);
+    setStatus("Signed in. Redirecting…");
+    window.location.href = next;
+  }
+
+  async function signUpPassword() {
+    setBusy(true); setError(null); setStatus(null);
+    const { error } = await supabaseAuth.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: redirectTo },
     });
-    if (error) setErr(error.message);
+    setBusy(false);
+
+    if (error) return setError(error.message);
+    setStatus("Account created. If email confirmation is enabled, check your inbox.");
   }
 
   async function sendMagicLink() {
-    setErr(null); setMsg(null);
-    setLoading(true);
+    setBusy(true); setError(null); setStatus(null);
     const { error } = await supabaseAuth.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: redirectTo }
+      options: { emailRedirectTo: redirectTo },
     });
-    setLoading(false);
-    if (error) setErr(error.message);
-    else setMsg("Check your email for a sign-in link.");
-  }
+    setBusy(false);
 
-  async function emailPassword() {
-    setErr(null); setMsg(null);
-    setLoading(true);
-
-    const fn = mode === "signin"
-      ? supabaseAuth.auth.signInWithPassword
-      : supabaseAuth.auth.signUp;
-
-    // @ts-ignore
-    const { error } = await fn({ email, password });
-
-    setLoading(false);
-    if (error) setErr(error.message);
-    else setMsg(mode === "signin" ? "Signed in." : "Account created. Check your email if confirmation is required.");
-    if (!error) window.location.href = "/account";
+    if (error) return setError(error.message);
+    setStatus("Magic link sent. Check your email.");
   }
 
   return (
-    <main className="p-6 max-w-md mx-auto">
-      <h1 className="text-2xl font-semibold text-white">Log in</h1>
-      <p className="mt-2 text-sm text-white/60">
-        Use Google, a magic link, or email + password.
+    <main className="mx-auto max-w-lg px-4 py-10 text-white">
+      <h1 className="text-4xl font-semibold">Log in</h1>
+      <p className="mt-2 text-white/60">
+        Use email + password (recommended). Magic link is optional.
       </p>
 
-      {(err || msg) && (
-        <div className={`mt-4 rounded-2xl border p-4 text-sm ${
-          err ? "border-red-500/30 bg-red-500/10 text-red-200" : "border-white/10 bg-white/5 text-white/70"
-        }`}>
-          {err ?? msg}
-        </div>
-      )}
-
-      <button
-        onClick={signInWithGoogle}
-        className="mt-6 w-full rounded-2xl bg-white text-black px-4 py-3 text-sm"
-      >
-        Continue with Google
-      </button>
-
-      <div className="mt-6 rounded-2xl border border-white/10 p-4">
-        <label className="text-xs text-white/60">Email</label>
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@domain.com"
-          className="mt-2 w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-sm text-white outline-none"
-        />
-
-        <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
+        <div className="flex gap-2">
           <button
-            onClick={sendMagicLink}
-            disabled={!email || loading}
-            className="rounded-xl border border-white/15 px-3 py-2 text-sm text-white/85 disabled:opacity-60"
+            onClick={() => setMode("signin")}
+            className={`rounded-full px-4 py-2 text-sm ${
+              mode === "signin" ? "bg-white text-black" : "border border-white/15 text-white/80"
+            }`}
           >
-            Send magic link
+            Sign in
           </button>
-
           <button
-            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-            className="rounded-xl border border-white/15 px-3 py-2 text-sm text-white/70"
+            onClick={() => setMode("signup")}
+            className={`rounded-full px-4 py-2 text-sm ${
+              mode === "signup" ? "bg-white text-black" : "border border-white/15 text-white/80"
+            }`}
           >
-            {mode === "signin" ? "Need an account?" : "Have an account?"}
+            Sign up
           </button>
         </div>
 
-        <div className="mt-6">
-          <label className="text-xs text-white/60">Password (optional)</label>
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            placeholder="••••••••"
-            className="mt-2 w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-sm text-white outline-none"
-          />
-          <button
-            onClick={emailPassword}
-            disabled={!email || !password || loading}
-            className="mt-3 w-full rounded-xl bg-white/10 text-white px-3 py-2 text-sm disabled:opacity-60"
-          >
-            {mode === "signin" ? "Sign in with password" : "Create account"}
-          </button>
+        <div className="mt-5 space-y-3">
+          <label className="block">
+            <div className="mb-1 text-xs text-white/60">Email</div>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@domain.com"
+              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none"
+              autoComplete="email"
+            />
+          </label>
+
+          <label className="block">
+            <div className="mb-1 text-xs text-white/60">Password</div>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="••••••••"
+              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none"
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+            />
+          </label>
+
+          {error ? (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              {error}
+            </div>
+          ) : null}
+
+          {status ? (
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+              {status}
+            </div>
+          ) : null}
+
+          {mode === "signin" ? (
+            <button
+              onClick={signInPassword}
+              disabled={busy || !email || !password}
+              className="w-full rounded-2xl bg-white px-4 py-3 font-medium text-black disabled:opacity-50"
+            >
+              {busy ? "Working…" : "Sign in"}
+            </button>
+          ) : (
+            <button
+              onClick={signUpPassword}
+              disabled={busy || !email || !password}
+              className="w-full rounded-2xl bg-white px-4 py-3 font-medium text-black disabled:opacity-50"
+            >
+              {busy ? "Working…" : "Create account"}
+            </button>
+          )}
+
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <button
+              onClick={sendMagicLink}
+              disabled={busy || !email}
+              className="rounded-2xl border border-white/15 px-4 py-3 text-sm text-white/80 disabled:opacity-50"
+            >
+              Send magic link
+            </button>
+
+            <a
+              className="text-sm text-white/60 underline"
+              href="/reset-password"
+            >
+              Forgot password?
+            </a>
+          </div>
         </div>
       </div>
+
+      <p className="mt-4 text-xs text-white/40">
+        Redirect URL used for auth emails: <span className="break-all">{redirectTo}</span>
+      </p>
     </main>
   );
 }
