@@ -11,17 +11,17 @@ function tierFromPriceId(priceId: string): Tier | null {
   if (priceId === process.env.STRIPE_PRICE_IDEAS) return "ideas";
   if (priceId === process.env.STRIPE_PRICE_CONVICTION) return "conviction";
   if (priceId === process.env.STRIPE_PRICE_MACRO) return "macro";
-  return null;
+  return undefined;
 }
 
-async function userIdFromCustomerId(customerId: string): Promise<string | null> {
+async function userIdFromCustomerId(customerId: string): Promise<string | undefined> {
   const { data, error } = await supabaseAdmin
     .from("profiles")
     .select("id")
     .eq("stripe_customer_id", customerId)
     .maybeSingle();
 
-  if (error) return null;
+  if (error) return undefined;
   return (data?.id as string) ?? null;
 }
 
@@ -108,8 +108,8 @@ export async function POST(req: Request) {
 
     let userId = (sub.metadata as any)?.userId as string | undefined;
     if (!userId) {
-      userId = await userIdFromCustomerId(customerId);
-    }
+      userId = (await userIdFromCustomerId(customerId)) ?? undefined;
+}
     if (!userId) return NextResponse.json({ received: true });
 
     const subscriptionId = sub.id;
@@ -134,8 +134,8 @@ export async function POST(req: Request) {
 
     let userId = (sub.metadata as any)?.userId as string | undefined;
     if (!userId) {
-      userId = await userIdFromCustomerId(customerId);
-    }
+      userId = (await userIdFromCustomerId(customerId)) ?? undefined;
+}
     if (!userId) return NextResponse.json({ received: true });
 
     await applyPlan({
