@@ -5,47 +5,39 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-type Tier = "ideas" | "conviction" | "macro";
-
-function tierFromPriceId(priceId: string): Tier | null {
+function tierFromPriceId(priceId: string): "ideas" | "conviction" | "macro" | null {
   if (priceId === process.env.STRIPE_PRICE_IDEAS) return "ideas";
   if (priceId === process.env.STRIPE_PRICE_CONVICTION) return "conviction";
   if (priceId === process.env.STRIPE_PRICE_MACRO) return "macro";
   return null;
 }
 
-async function setPlan(args: {
+async function applySubscriptionToUser(args: {
   userId: string;
-  plan: Tier | "free";
-  stripeCustomerId?: string | null;
-  stripeSubscriptionId?: string | null;
+  customerId?: string | null;
+  subscriptionId?: string | null;
+  priceId?: string | null;
 }) {
-  const { userId, plan, stripeCustomerId, stripeSubscriptionId } = args;
+  const { userId, customerId, subscriptionId, priceId } = args;
+
+  const plan = priceId ? tierFromPriceId(priceId) : null;
+  if (!plan) return;
 
   await supabaseAdmin
-    .from(" hookup" as any); // <-- guard against tree-shaking weirdness (harmless)
-}
-
-async function updateProfilePlan(args: {
-  userId: string;
-  plan: Tier | "free";
-  stripeCustomerId?: string | null;
-  stripeSubscriptionId?: string | null;
-}) {
-  const { userId, plan, stripeCustomerId, stripeSubscriptionId } = args;
-
-  const patch: any = { plan };
-  if (stripeCustomerId) patch.stripe_customer_id = stripeCustomerId;
-  if (stripeSubscriptionId) patch.stripe_subscription_id = stripeSubscriptionId;
-
-  await supabaseAdmin.from("profiles").update(patch).eq("id", userId);
+    .from("profiles")
+    .update({
+      plan,
+      stripe_customer_id: customerId ?? null,
+      stripe_subscription_id: subscriptionId ?? null,
+    })
+    .eq("id", userId);
 }
 
 export async function POST(req: Request) {
   const sig = req.headers.get("stripe-signature");
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!sig || !webhookSecret) {
+  if (!sig || !secret) {
     return NextResponse.json({ error: "Missing stripe-signature or STRIPE_WEBHOOK_SECRET" }, { status: 400 });
   }
 
@@ -53,60 +45,64 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+    event = stripe.webhooks.constructEvent(body, sig, secret);
   } catch (err: any) {
     return NextResponse.json({ error: `Webhook signature failed: ${err.message}` }, { status: 400 });
   }
 
-  // We care about subscription lifecycle.
+  // Primary: checkout session completed (reliable metadata)
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
+    const userId = (session.metadata as any)?.userId as string | undefined;
+    if (!userId) return NextResponse.json({ received: true });
 
-    const userId = session.metadata?.userId;
-    const tier = session.metadata?.tier as Tier | undefined;
+    const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
+    const customerId = typeof session.customer === "string" ? session.customer : null;
 
-    if (userId && tier) {
-      await updateProfilePlan({
-        userId,
-        plan: tier,
-        stripeCustomerId: (session.customer as string) ?? null,
-        stripeSubscriptionId: (session.subscription as string) ?? null,
-      });
+    let priceId: string | null = null;
+    if (subscriptionId) {
+      const sub = await stripe.subscriptions.retrieve(subscriptionId, { expand: ["items.data.price"] });
+      priceId = sub.items.data?.[0]?.price?.id ?? null;
     }
+
+    await applySubscriptionToUser({ userId, customerId, subscriptionId, priceId });
+    return NextResponse.json({ received: true });
   }
 
+  // Subscription updates/cancels
   if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created") {
     const sub = event.data.object as Stripe.Subscription;
 
-    // We set metadata at checkout.session — but subscription metadata may be empty.
-    // So we’ll try to read it; if missing, we still can map by priceId but won’t know userId.
-    const userId = (sub.metadata?.userId as string) || null;
+    // We don't always have metadata here depending on how it was created.
+    // If you want this to work 100% for these events, you must ensure subscription metadata is set.
+    // For now, we only act if metadata.userId exists.
+    const userId = (sub.metadata as any)?.userId as string | undefined;
+    if (!userId) return NextResponse.json({ received: true });
 
-    const priceId = sub.items.data?.[0]?.price?.id;
-    const tier = priceId ? tierFromPriceId(priceId) : null;
+    const customerId = typeof sub.customer === "string" ? sub.customer : null;
+    const subscriptionId = sub.id;
+    const priceId = sub.items.data?.[0]?.price?.id ?? null;
 
-    if (userId && tier) {
-      await updateProfilePlan({
-        userId,
-        plan: tier,
-        stripeCustomerId: (sub.customer as string) ?? null,
-        stripeSubscriptionId: sub.id,
-      });
-    }
+    await applySubscriptionToUser({ userId, customerId, subscriptionId, priceId });
+    return NextResponse.json({ received: true });
   }
 
   if (event.type === "customer.subscription.deleted") {
     const sub = event.data.object as Stripe.Subscription;
-    const userId = (sub.metadata?.userId as string) || null;
+    const userId = (sub.metadata as any)?.userId as string | undefined;
 
-    if (userId) {
-      await updateProfilePlan({
-        userId,
+    // If we don't have userId metadata, we can't map it safely.
+    if (!userId) return NextResponse.json({ received: true });
+
+    await supabaseAdmin
+      .from("profiles")
+      .update({
         plan: "free",
-        stripeCustomerId: (sub.customer as string) ?? null,
-        stripeSubscriptionId: sub.id,
-      });
-    }
+        stripe_subscription_id: null,
+      })
+      .eq("id", userId);
+
+    return NextResponse.json({ received: true });
   }
 
   return NextResponse.json({ received: true });
