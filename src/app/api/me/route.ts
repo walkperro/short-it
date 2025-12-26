@@ -4,7 +4,7 @@ import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server
 export const runtime = "nodejs";
 
 export async function GET() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
 
   const user = data.user;

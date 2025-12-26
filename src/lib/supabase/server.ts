@@ -2,8 +2,10 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 
-export function createSupabaseServerClient() {
-  const cookieStore = cookies();
+// SERVER (cookie-based) client — use this inside Route Handlers / Server Components
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
@@ -14,18 +16,19 @@ export function createSupabaseServerClient() {
       },
       setAll(cookiesToSet) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
         } catch {
-          // ignore if called from a server component without cookie mutation support
+          // ignore if called from a server component without mutating cookies
         }
       },
     },
   });
 }
 
-// Admin client for server-side DB ops (webhooks, gated reads, admin APIs)
+// ADMIN client (service role) — ONLY for server-side routes
 export const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
