@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, createClient } from "@supabase/ssr";
 
 export function createSupabaseServerClient() {
   const cookieStore = cookies();
@@ -23,3 +23,11 @@ export function createSupabaseServerClient() {
     },
   });
 }
+
+// Server-only admin client (Service Role) for webhooks / billing portal updates.
+// IMPORTANT: Never expose SUPABASE_SERVICE_ROLE_KEY to the client.
+export const supabaseAdmin = (() => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(url, serviceRole);
+})();
