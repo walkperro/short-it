@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/server";
+
+export const runtime = "nodejs";
 
 export async function GET(
   _req: NextRequest,
@@ -8,9 +10,7 @@ export async function GET(
   try {
     const { slug } = await context.params;
 
-    const supabase = await createSupabaseServerClient();
-
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("ideas_public")
       .select("*")
       .eq("slug", slug)
@@ -19,7 +19,6 @@ export async function GET(
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
     if (!data) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
