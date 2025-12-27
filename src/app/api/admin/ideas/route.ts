@@ -3,8 +3,16 @@ import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server
 
 export const runtime = "nodejs";
 
+function slugify(input: string) {
+  return String(input ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 async function requireAdmin() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
   const user = data.user;
   if (!user) return { ok: false as const, status: 401, error: "Not signed in" };
@@ -38,21 +46,36 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
 
+  const title = String(body.title ?? "").trim();
+  const ticker = String(body.ticker ?? "").toUpperCase().trim();
+
+  // Guarantee slug
+  let slug = String(body.slug ?? "").trim();
+  if (!slug) {
+    const base = slugify(`${ticker || "idea"}-${title || "draft"}`) || "idea";
+    slug = `${base}-${Math.random().toString(36).slice(2, 7)}`;
+  } else {
+    slug = slugify(slug);
+  }
+
+  const status = body.status === "published" ? "published" : "draft";
+  const published_at = status === "published" ? new Date().toISOString() : null;
+
   const payload: any = {
-    slug: body.slug,
-    title: body.title,
-    ticker: String(body.ticker ?? "").toUpperCase(),
+    slug,
+    title,
+    ticker,
     direction: body.direction ?? "long",
-    start_date: body.start_date,
-    end_date: body.end_date,
-    target_price: Number(body.target_price),
+    start_date: body.start_date || null,
+    end_date: body.end_date || null,
+    target_price: Number(body.target_price) || null,
     teaser: body.teaser ?? null,
     summary: body.summary ?? null,
     conviction: body.conviction ?? null,
     macro_context: body.macro_context ?? null,
-    status: body.status ?? "draft",
+    status,
     author_id: auth.userId,
-    published_at: body.status === "published" ? new Date().toISOString() : null,
+    published_at,
   };
 
   const { data, error } = await supabaseAdmin.from("ideas").insert(payload).select("*").single();
