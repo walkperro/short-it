@@ -1,6 +1,5 @@
+import Link from "next/link";
 import { getRequestBaseUrl } from "@/lib/server-url";
-
-export const dynamic = "force-dynamic";
 
 type Idea = {
   id: string;
@@ -8,60 +7,73 @@ type Idea = {
   title: string;
   ticker: string;
   direction: "long" | "short";
-  start_date: string;
-  end_date: string;
-  target_price: number;
-  teaser: string | null;
+  teaser?: string | null;
   created_at: string;
-  published_at: string | null;
 };
 
-function fmt(ts?: string | null) {
-  if (!ts) return "—";
-  return new Date(ts).toLocaleString();
-}
+export const runtime = "nodejs";
 
 export default async function IdeasPage() {
-  const baseUrl = getRequestBaseUrl();
-  const res = await fetch(`${baseUrl}/api/ideas`, { cache: "no-store" });
-  const json = await res.json().catch(() => ({}));
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (await getRequestBaseUrl());
 
-  if (!res.ok) return <div className="p-6 text-white">Error: {json.error ?? "Failed to load ideas"}</div>;
+  let items: Idea[] = [];
+  let errorMsg: string | null = null;
 
-  const ideas: Idea[] = json.data ?? [];
+  try {
+    const res = await fetch(`${baseUrl}/api/ideas`, { cache: "no-store" });
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      errorMsg = json?.error ?? `Failed to load ideas (${res.status})`;
+    } else {
+      items = (json?.data ?? []) as Idea[];
+    }
+  } catch (e: any) {
+    errorMsg = e?.message ?? "Failed to load ideas.";
+  }
 
   return (
-    <main className="p-6 max-w-3xl mx-auto text-white">
-      <h1 className="text-2xl font-semibold">Ideas</h1>
-      <p className="text-sm text-white/70 mt-1">
-        Public sees the teaser. LEVEL I unlocks the full thesis.
-      </p>
+    <main className="mx-auto max-w-5xl p-6 text-white">
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold">Ideas</h1>
+          <p className="mt-1 text-sm text-white/60">Published ideas.</p>
+        </div>
+      </div>
+
+      {errorMsg ? (
+        <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          {errorMsg}
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-4">
-        {ideas.map((idea) => (
-          <a
-            key={idea.id}
-            href={`/ideas/${idea.slug}`}
-            className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition"
+        {items.map((i) => (
+          <Link
+            key={i.id}
+            href={`/ideas/${i.slug}`}
+            className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10"
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="font-medium">{idea.title}</div>
-              <div className="text-sm text-white/70">
-                {idea.ticker} · {idea.direction.toUpperCase()}
+              <div className="text-lg font-semibold">{i.title}</div>
+              <div className="text-xs text-white/60">
+                {i.ticker} • {i.direction.toUpperCase()}
               </div>
             </div>
-
-            <div className="mt-2 text-sm text-white/70 flex flex-wrap gap-x-3 gap-y-1">
-              <span>Target: {idea.target_price}</span>
-              <span>·</span>
-              <span>{idea.start_date} → {idea.end_date}</span>
-              <span>·</span>
-              <span>Posted: {fmt(idea.published_at ?? idea.created_at)}</span>
+            {i.teaser ? (
+              <div className="mt-2 text-sm text-white/70">{i.teaser}</div>
+            ) : null}
+            <div className="mt-3 text-xs text-white/40">
+              {new Date(i.created_at).toLocaleString()}
             </div>
-
-            <div className="mt-3 text-sm text-white/80 whitespace-pre-wrap">{idea.teaser ?? "—"}</div>
-          </a>
+          </Link>
         ))}
+
+        {!errorMsg && items.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
+            No published ideas yet.
+          </div>
+        ) : null}
       </div>
     </main>
   );
