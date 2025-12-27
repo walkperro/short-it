@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 
 async function getBaseUrl() {
-  const h = headers();
+  const h = await headers();
   const proto = h.get("x-forwarded-proto") ?? "https";
   const host = h.get("x-forwarded-host") ?? h.get("host");
   if (!host) return "";
