@@ -1,20 +1,18 @@
 import Link from "next/link";
-import { headers } from "next/headers";
+import { getRequestBaseUrl } from "@/lib/server-url";
 
-async function getBaseUrl() {
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  if (!host) return "";
-  return `${proto}://${host}`;
-}
+export const runtime = "nodejs";
 
-export default async function IdeaPage({ params }: { params: { slug: string } }) {
-  const baseUrl = await getBaseUrl();
+export default async function IdeaPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
 
-  const res = await fetch(`${baseUrl}/api/ideas/${params.slug}`, {
-    cache: "no-store",
-  });
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (await getRequestBaseUrl());
+
+  const res = await fetch(`${baseUrl}/api/ideas/${slug}`, { cache: "no-store" });
 
   if (!res.ok) {
     return (
@@ -23,7 +21,9 @@ export default async function IdeaPage({ params }: { params: { slug: string } })
           This idea couldn&apos;t be loaded. (Likely a database/view or permissions issue.)
         </div>
         <div className="mt-4">
-          <Link className="underline" href="/ideas">Back to Ideas</Link>
+          <Link className="underline" href="/ideas">
+            Back to Ideas
+          </Link>
         </div>
       </div>
     );
@@ -35,7 +35,9 @@ export default async function IdeaPage({ params }: { params: { slug: string } })
   return (
     <div className="mx-auto max-w-3xl p-6">
       <div className="mb-6">
-        <Link className="underline" href="/ideas">← Back</Link>
+        <Link className="underline" href="/ideas">
+          ← Back
+        </Link>
       </div>
 
       <h1 className="text-3xl font-semibold">{idea.title}</h1>
