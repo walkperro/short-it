@@ -85,14 +85,14 @@ export default function SubscribePage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
+        <div className="rounded-2xl border border-white/10 card px-4 py-3 text-sm">
           <div className="text-white/60">Current plan</div>
           <div className="mt-1 font-medium">{planLabel}</div>
         </div>
       </div>
 
       {!userEmail && !busyMe && (
-        <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+        <div className="mt-4 rounded-2xl border border-white/10 card p-4 text-sm text-white/70">
           You’re not logged in.{" "}
           <Link className="underline text-white" href="/login?next=/subscribe">
             Log in
@@ -154,7 +154,7 @@ export default function SubscribePage() {
         />
       </div>
 
-      <div className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6">
+      <div className="mt-10 rounded-3xl border border-white/10 card p-6">
         <h2 className="text-lg font-semibold">What you’re buying</h2>
         <p className="mt-2 text-sm text-white/70">
           LEVEL I gives you the actionable thesis. LEVEL II explains the conviction. LEVEL III adds macro regime context.
@@ -187,14 +187,14 @@ function TierCard({
   disabled: boolean;
 }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+    <div className="rounded-3xl border border-white/10 card p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-lg font-semibold">{title}</div>
           <div className="mt-1 text-sm text-white/60">{price}</div>
         </div>
         {tag ? (
-          <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs text-white/70">
+          <span className="rounded-full border border-white/10 card px-3 py-1 text-xs text-white/70">
             {tag}
           </span>
         ) : null}

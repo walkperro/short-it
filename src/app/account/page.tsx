@@ -92,7 +92,7 @@ export default function AccountPage() {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10 text-white">
         <h1 className="text-4xl font-semibold">Account</h1>
-        <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
+        <div className="mt-6 rounded-3xl border border-white/10 card p-6">
           <p className="text-white/70">You’re not logged in.</p>
           <Link
             href="/login?next=/account"
@@ -109,7 +109,7 @@ export default function AccountPage() {
     <main className="mx-auto max-w-3xl px-4 py-10 text-white">
       <h1 className="text-4xl font-semibold">Account</h1>
 
-      <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
+      <div className="mt-6 rounded-3xl border border-white/10 card p-6">
         <div className="text-sm text-white/60">Signed in as</div>
         <div className="mt-1 break-all text-lg">{email}</div>
 

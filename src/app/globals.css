@@ -1,26 +1,86 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #0B0B0B;
+  color: #FFFFFF;
+}
+
+/* --- SHORT-IT entry modal animations --- */
+@keyframes shortitFadeUp {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes shortitSheen {
+  0%   { transform: translateX(-30%) translateY(-10%); opacity: 0.15; }
+  35%  { opacity: 0.22; }
+  100% { transform: translateX(30%) translateY(10%); opacity: 0.10; }
+}
+
+.shortit-modal {
+  animation: shortitFadeUp 260ms ease-out both;
+}
+
+.shortit-sheen {
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(255,255,255,0.08) 35%,
+    rgba(225,6,0,0.10) 50%,
+    rgba(255,255,255,0.06) 65%,
+    transparent 100%
+  );
+  animation: shortitSheen 2.8s ease-in-out infinite;
+}
+
+/* --- SHORT-IT "ENTER" micro-interactions --- */
+.shortit-enter-underline {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(225,6,0,0.95), transparent);
+  transform: translateX(-110%);
+  opacity: 0.0;
+  transition: transform 320ms ease, opacity 220ms ease;
+}
+
+.shortit-enter:hover .shortit-enter-underline {
+  transform: translateX(110%);
+  opacity: 0.85;
+}
+
+@keyframes shortitArrowWiggle {
+  0% { transform: translateX(0); }
+  40% { transform: translateX(3px); }
+  70% { transform: translateX(1px); }
+  100% { transform: translateX(0); }
+}
+
+.shortit-enter-arrow {
+  display: inline-block;
+  transition: transform 180ms ease, opacity 180ms ease;
+  opacity: 0.9;
+}
+
+.shortit-enter:hover .shortit-enter-arrow {
+  animation: shortitArrowWiggle 420ms ease-out 1;
+  opacity: 1;
+}
+
+@keyframes shortitArmedPulse {
+  0% { box-shadow: 0 0 0 rgba(225,6,0,0.0); }
+  35% { box-shadow: 0 0 0 rgba(225,6,0,0.0), 0 0 0 6px rgba(225,6,0,0.10); }
+  70% { box-shadow: 0 0 0 rgba(225,6,0,0.0), 0 0 0 10px rgba(225,6,0,0.00); }
+  100% { box-shadow: 0 0 0 rgba(225,6,0,0.0); }
+}
+
+.shortit-enter-armed {
+  box-shadow: 0 0 0 rgba(225,6,0,0.0);
+  animation: shortitArmedPulse 1.6s ease-in-out infinite;
 }

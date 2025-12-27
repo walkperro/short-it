@@ -54,7 +54,7 @@ export default function UpdatePasswordPage() {
         Enter a new password for your account.
       </p>
 
-      <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
+      <div className="mt-6 rounded-3xl border border-white/10 card p-6">
         <label className="block">
           <div className="mb-1 text-xs text-white/60">New password</div>
           <input
@@ -62,7 +62,7 @@ export default function UpdatePasswordPage() {
             onChange={(e) => setPassword(e.target.value)}
             type="password"
             placeholder="••••••••"
-            className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none"
+            className="w-full rounded-2xl border border-white/10 card px-4 py-3 text-white outline-none"
             autoComplete="new-password"
             disabled={loading || !!err}
           />
@@ -75,7 +75,7 @@ export default function UpdatePasswordPage() {
             onChange={(e) => setPassword2(e.target.value)}
             type="password"
             placeholder="••••••••"
-            className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none"
+            className="w-full rounded-2xl border border-white/10 card px-4 py-3 text-white outline-none"
             autoComplete="new-password"
             disabled={loading || !!err}
           />

@@ -32,14 +32,14 @@ export default function ResetPasswordPage() {
       <h1 className="text-4xl font-semibold">Reset password</h1>
       <p className="mt-2 text-white/60">We’ll email you a reset link.</p>
 
-      <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
+      <div className="mt-6 rounded-3xl border border-white/10 card p-6">
         <label className="block">
           <div className="mb-1 text-xs text-white/60">Email</div>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@domain.com"
-            className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none"
+            className="w-full rounded-2xl border border-white/10 card px-4 py-3 text-white outline-none"
             autoComplete="email"
           />
         </label>

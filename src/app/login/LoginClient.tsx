@@ -72,7 +72,7 @@ export default function LoginClient() {
       <h1 className="text-4xl font-semibold">Log in</h1>
       <p className="mt-2 text-white/60">Use email + password (recommended). Magic link is optional.</p>
 
-      <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
+      <div className="mt-6 rounded-3xl border border-white/10 card p-6">
         <div className="flex gap-2">
           <button
             onClick={() => setMode("signin")}
@@ -99,7 +99,7 @@ export default function LoginClient() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@domain.com"
-              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none"
+              className="w-full rounded-2xl border border-white/10 card px-4 py-3 text-white outline-none"
               autoComplete="email"
             />
           </label>
@@ -111,7 +111,7 @@ export default function LoginClient() {
               onChange={(e) => setPassword(e.target.value)}
               type="password"
               placeholder="••••••••"
-              className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none"
+              className="w-full rounded-2xl border border-white/10 card px-4 py-3 text-white outline-none"
               autoComplete={mode === "signin" ? "current-password" : "new-password"}
             />
           </label>

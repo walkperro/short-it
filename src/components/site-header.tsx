@@ -1,59 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/auth/AuthProvider";
+import UserMenu from "@/components/UserMenu";
 
-export function SiteHeader() {
-  const { user, loading, signOut } = useAuth();
-  const router = useRouter();
-
-  async function handleSignOut() {
-    await signOut();
-    router.push("/");
-    router.refresh();
-  }
-
+export default function SiteHeader() {
   return (
-    <header className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 text-white">
-      <Link href="/" className="text-sm tracking-widest text-white/80">
-        SHORT-IT
-      </Link>
-
-      <nav className="flex items-center gap-3">
-        <Link className="rounded-full border border-white/10 px-4 py-2 text-sm" href="/ideas">
-          Ideas
-        </Link>
-        <Link className="rounded-full border border-white/10 px-4 py-2 text-sm" href="/subscribe">
-          Subscribe
-        </Link>
-        <Link className="rounded-full border border-white/10 px-4 py-2 text-sm" href="/account">
-          Account
+    <header className="sticky top-0 z-40 border-b border-brand-border bg-brand-black/80 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+        <Link href="/" className="text-lg font-semibold tracking-tight">
+          <span className="text-brand-red">SHORT</span>
+          <span className="text-white">-IT</span>
         </Link>
 
-        <div className="ml-2 flex items-center gap-3">
-          {!loading && user?.email ? (
-            <>
-              <span className="max-w-[140px] truncate text-xs text-white/60">
-                {user.email}
-              </span>
-              <button
-                onClick={handleSignOut}
-                className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black"
-              >
-                Sign out
-              </button>
-            </>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black"
-            >
-              Log in
-            </Link>
-          )}
-        </div>
-      </nav>
+        <nav className="flex items-center gap-3">
+          <Link
+            href="/ideas"
+            className="rounded-full px-4 py-2 text-sm text-white/80 hover:text-white transition"
+          >
+            Ideas
+          </Link>
+          <UserMenu />
+        </nav>
+      </div>
     </header>
   );
 }
+
+

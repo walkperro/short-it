@@ -42,8 +42,10 @@ export default function AdminPage() {
     setErr(null);
     const res = await fetch("/api/admin/ideas", { cache: "no-store" }).catch(() => null);
     if (!res) return setErr("Failed to load admin data.");
+
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return setErr(json?.error ?? "Not authorized.");
+
     setRows(json.data ?? []);
   }
 
@@ -54,6 +56,7 @@ export default function AdminPage() {
   async function createIdea() {
     setBusy(true);
     setErr(null);
+
     try {
       const res = await fetch("/api/admin/ideas", {
         method: "POST",
@@ -63,22 +66,25 @@ export default function AdminPage() {
           title,
           ticker,
           direction,
-          start_date: startDate,
-          end_date: endDate,
-          target_price: Number(targetPrice),
+          start_date: startDate || null,
+          end_date: endDate || null,
+          target_price: targetPrice ? Number(targetPrice) : null,
           status,
-          teaser,
-          summary,
-          conviction,
-          macro_context: macro,
+          teaser: teaser || null,
+          summary: summary || null,
+          conviction: conviction || null,
+          macro_context: macro || null,
         }),
       });
+
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error ?? "Create failed");
 
       setSlug("");
       setTitle("");
       setTicker("");
+      setStartDate("");
+      setEndDate("");
       setTargetPrice("");
       setTeaser("");
       setSummary("");
@@ -99,8 +105,9 @@ export default function AdminPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Admin</h1>
-          <p className="mt-1 text-sm text-white/60">Post Ideas + Conviction + Macro. Publish when ready.</p>
+          <p className="mt-1 text-sm text-white/60">Post Ideas. Publish when ready.</p>
         </div>
+
         <div className="flex gap-2">
           <Link className="rounded-2xl border border-white/15 px-4 py-2 text-sm text-white/80" href="/ideas">
             View site
@@ -171,20 +178,26 @@ export default function AdminPage() {
 
       <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
         <h2 className="text-lg font-semibold">Recent Ideas</h2>
+
         <div className="mt-4 grid gap-3">
           {rows.map((r) => (
             <a
               key={r.id}
               href={`/ideas/${r.slug}`}
-              className="rounded-2xl border border-white/10 bg-black/30 p-4 hover:bg-black/40 transition"
+              className="rounded-2xl border border-white/10 bg-black/30 p-4 transition hover:bg-black/40"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="font-medium">
                   {r.title} <span className="text-white/60">({r.ticker})</span>
                 </div>
-                <div className="text-xs text-white/60">{r.status.toUpperCase()} · {fmt(r.published_at ?? r.created_at)}</div>
+                <div className="text-xs text-white/60">
+                  {r.status.toUpperCase()} · {fmt(r.published_at ?? r.created_at)}
+                </div>
               </div>
-              <div className="mt-1 text-sm text-white/70">{r.direction.toUpperCase()} · /ideas/{r.slug}</div>
+
+              <div className="mt-1 text-sm text-white/70">
+                {r.direction.toUpperCase()} · /ideas/{r.slug}
+              </div>
             </a>
           ))}
         </div>
@@ -193,7 +206,17 @@ export default function AdminPage() {
   );
 }
 
-function Field({ label, value, onChange, placeholder }: any) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   return (
     <label className="block">
       <div className="mb-1 text-xs text-white/60">{label}</div>
@@ -207,7 +230,17 @@ function Field({ label, value, onChange, placeholder }: any) {
   );
 }
 
-function TextArea({ label, value, onChange, rows }: any) {
+function TextArea({
+  label,
+  value,
+  onChange,
+  rows,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  rows: number;
+}) {
   return (
     <label className="block">
       <div className="mb-1 text-xs text-white/60">{label}</div>
