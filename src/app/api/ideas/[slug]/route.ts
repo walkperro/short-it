@@ -1,33 +1,32 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export const runtime = "nodejs";
-
-type Ctx = { params: Promise<{ slug: string }> };
-
-export async function GET(_req: NextRequest, ctx: Ctx) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { slug: string } }
+) {
   try {
-    const { slug } = await ctx.params;
+    const supabase = await createSupabaseServerClient();
 
-    if (!slug) {
-      return NextResponse.json({ error: "Missing slug" }, { status: 400 });
-    }
-
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from("ideas_public")
       .select("*")
-      .eq("slug", slug)
-      .single();
+      .eq("slug", params.slug)
+      .maybeSingle();
 
     if (error) {
-      // Helpful debugging in Vercel logs
-      console.error("[api/ideas/[slug]] supabase error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!data) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     return NextResponse.json({ data });
-  } catch (e) {
-    console.error("[api/ideas/[slug]] unexpected error:", e);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message ?? "Unknown error" },
+      { status: 500 }
+    );
   }
 }

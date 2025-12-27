@@ -1,63 +1,77 @@
-import { notFound } from "next/navigation";
-import { getRequestBaseUrl } from "@/lib/server-url";
+import Link from "next/link";
+import { headers } from "next/headers";
 
-export const runtime = "nodejs";
+async function getBaseUrl() {
+  const h = headers();
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return "";
+  return `${proto}://${host}`;
+}
 
-export default async function IdeaDetailPage({ params }: { params: { slug: string } }) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (await getRequestBaseUrl());
-  const slug = params.slug;
+export default async function IdeaPage({ params }: { params: { slug: string } }) {
+  const baseUrl = await getBaseUrl();
 
-  try {
-    const res = await fetch(`${baseUrl}/api/ideas/${encodeURIComponent(slug)}`, { cache: "no-store" });
-    const json = await res.json().catch(() => ({}));
+  const res = await fetch(`${baseUrl}/api/ideas/${params.slug}`, {
+    cache: "no-store",
+  });
 
-    if (res.status === 404) return notFound();
-    if (!res.ok) throw new Error(json?.error ?? `Failed (${res.status})`);
-
-    const idea = json?.data;
-    if (!idea) return notFound();
-
+  if (!res.ok) {
     return (
-      <main className="mx-auto max-w-3xl p-6 text-white">
-        <div className="text-xs text-white/60">
-          {idea.ticker} • {String(idea.direction ?? "").toUpperCase()}
+      <div className="mx-auto max-w-3xl p-6">
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-red-100">
+          This idea couldn&apos;t be loaded. (Likely a database/view or permissions issue.)
         </div>
-        <h1 className="mt-2 text-3xl font-semibold">{idea.title}</h1>
-
-        {idea.teaser ? <p className="mt-4 text-white/80">{idea.teaser}</p> : null}
-
-        <div className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-          {idea.summary ? (
-            <section>
-              <h2 className="text-sm font-semibold text-white/70">Thesis</h2>
-              <p className="mt-2 text-sm text-white/80 whitespace-pre-wrap">{idea.summary}</p>
-            </section>
-          ) : null}
-
-          {idea.conviction ? (
-            <section>
-              <h2 className="text-sm font-semibold text-white/70">Conviction</h2>
-              <p className="mt-2 text-sm text-white/80 whitespace-pre-wrap">{idea.conviction}</p>
-            </section>
-          ) : null}
-
-          {idea.macro_context ? (
-            <section>
-              <h2 className="text-sm font-semibold text-white/70">Macro</h2>
-              <p className="mt-2 text-sm text-white/80 whitespace-pre-wrap">{idea.macro_context}</p>
-            </section>
-          ) : null}
+        <div className="mt-4">
+          <Link className="underline" href="/ideas">Back to Ideas</Link>
         </div>
-      </main>
-    );
-  } catch {
-    // If your API/view is misconfigured, don’t hard-crash the whole page.
-    return (
-      <main className="mx-auto max-w-3xl p-6 text-white">
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          This idea couldn’t be loaded. (Likely a database/view or permissions issue.)
-        </div>
-      </main>
+      </div>
     );
   }
+
+  const json = await res.json();
+  const idea = json?.data;
+
+  return (
+    <div className="mx-auto max-w-3xl p-6">
+      <div className="mb-6">
+        <Link className="underline" href="/ideas">← Back</Link>
+      </div>
+
+      <h1 className="text-3xl font-semibold">{idea.title}</h1>
+      <div className="mt-2 text-sm opacity-70">
+        {idea.ticker} • {idea.direction?.toUpperCase?.() ?? idea.direction}
+      </div>
+
+      <div className="mt-6 space-y-6">
+        {idea.teaser && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold opacity-70">Teaser</h2>
+            <p className="whitespace-pre-wrap leading-relaxed">{idea.teaser}</p>
+          </section>
+        )}
+
+        {idea.summary && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold opacity-70">Idea Thesis (LEVEL I)</h2>
+            <p className="whitespace-pre-wrap leading-relaxed">{idea.summary}</p>
+          </section>
+        )}
+
+        {idea.conviction && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold opacity-70">Conviction (LEVEL II)</h2>
+            <p className="whitespace-pre-wrap leading-relaxed">{idea.conviction}</p>
+          </section>
+        )}
+
+        {idea.macro_context && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold opacity-70">Macro (LEVEL III)</h2>
+            <p className="whitespace-pre-wrap leading-relaxed">{idea.macro_context}</p>
+          </section>
+        )}
+      </div>
+    </div>
+  );
 }
