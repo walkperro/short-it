@@ -3,15 +3,17 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { slug: string } }
-) {
+  context: { params: Promise<{ slug: string }> }
+): Promise<Response> {
   try {
+    const { slug } = await context.params;
+
     const supabase = await createSupabaseServerClient();
 
     const { data, error } = await supabase
       .from("ideas_public")
       .select("*")
-      .eq("slug", params.slug)
+      .eq("slug", slug)
       .maybeSingle();
 
     if (error) {
@@ -22,7 +24,7 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ data }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message ?? "Unknown error" },
