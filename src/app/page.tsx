@@ -1,112 +1,115 @@
 import Link from "next/link";
+import { getRequestBaseUrl } from "@/lib/server-url";
 
-function TierCard({
-  title,
-  price,
-  bullets,
-}: {
+type Idea = {
+  id: string;
+  slug: string;
   title: string;
-  price: string;
-  bullets: string[];
-}) {
+  ticker: string;
+  direction: "long" | "short";
+  teaser?: string | null;
+  created_at: string;
+};
+
+export const runtime = "nodejs";
+
+export default async function HomePage() {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (await getRequestBaseUrl());
+
+  let items: Idea[] = [];
+  let errorMsg: string | null = null;
+
+  try {
+    const res = await fetch(`${baseUrl}/api/ideas`, { cache: "no-store" });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      errorMsg = json?.error ?? `Failed to load ideas (${res.status})`;
+    } else {
+      items = (json?.data ?? []) as Idea[];
+    }
+  } catch (e: any) {
+    errorMsg = e?.message ?? "Failed to load ideas.";
+  }
+
+  // show a clean “most recent” slice
+  const recent = items.slice(0, 6);
+
   return (
-    <div className="glass p-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-xs tracking-[0.22em] text-white/50">TIER</div>
-          <div className="mt-2 text-xl font-semibold">{title}</div>
-          <div className="mt-1 text-white/60">{price}</div>
-        </div>
-        <div className="h-10 w-10 rounded-2xl border border-white/10 bg-black/30" />
-      </div>
-
-      <ul className="mt-5 list-disc space-y-2 pl-5 text-white/70">
-        {bullets.map((b) => (
-          <li key={b}>{b}</li>
-        ))}
-      </ul>
-
-      <div className="mt-6">
-        <Link
-          href="/subscribe"
-          className="micro-press inline-flex w-full items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-black hover:brightness-95"
-        >
-          View plans
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-export default function Home() {
-  return (
-    <div className="space-y-10">
-      <section className="pt-6">
-        <div className="text-xs tracking-[0.25em] text-white/50">SHORT-IT</div>
+    <main className="mx-auto max-w-6xl px-6 py-12 text-white">
+      <div className="max-w-2xl">
+        <div className="text-xs tracking-[0.35em] text-white/40">SHORT-IT</div>
         <h1 className="mt-3 text-5xl font-semibold tracking-tight">
-          Trade ideas<span className="text-[#E10600]">.</span>
+          Trade ideas<span className="text-red-500">.</span>
         </h1>
-        <p className="mt-3 max-w-2xl text-white/70">
-          High-conviction setups with clean structure. Not financial advice.
-        </p>
 
-        <div className="mt-7 flex flex-wrap gap-3">
+        {/* NEW subtitle */}
+        <p className="mt-4 text-base text-white/60">
+  Curated setups based on historical market structure.
+  <br />
+  <em className="text-white/50">Educational use only.</em>
+</p>
+      </div>
+
+      {errorMsg && (
+        <div className="mt-8 rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200">
+          {errorMsg}
+        </div>
+      )}
+
+      <section className="mt-10">
+        <div className="flex items-end justify-between">
+          <h2 className="text-sm font-semibold tracking-widest text-white/70">
+            MOST RECENT
+          </h2>
           <Link
             href="/ideas"
-            className="micro-press inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-black hover:brightness-95"
+            className="text-sm text-white/60 underline underline-offset-4 hover:text-white"
           >
-            View Ideas
-          </Link>
-          <Link
-            href="/subscribe"
-            className="micro-press inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
-          >
-            Subscribe
-          </Link>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <div className="text-xs tracking-[0.22em] text-white/50">TIERS</div>
-            <h2 className="mt-2 text-2xl font-semibold">Unlock more context</h2>
-          </div>
-          <Link className="text-sm text-white/60 underline underline-offset-4 hover:text-white" href="/subscribe">
-            Compare
+            View all
           </Link>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <TierCard
-            title="Ideas (Level I)"
-            price="$29.99 / month"
-            bullets={[
-              "3–4 ideas per month",
-              "Targets + timeframes",
-              "Full thesis unlocked",
-            ]}
-          />
-          <TierCard
-            title="Conviction (Level II)"
-            price="$79.99 / month"
-            bullets={[
-              "Technical + fundamental reasoning",
-              "Positioning + key levels",
-              "Unlocks Conviction section",
-            ]}
-          />
-          <TierCard
-            title="Macro (Level III)"
-            price="$199.99 / month"
-            bullets={[
-              "Regime view: rates, spreads, credit",
-              "Risk-on/off + drivers",
-              "Unlocks Macro context",
-            ]}
-          />
+        <div className="mt-5 grid gap-4">
+          {recent.map((i) => (
+            <Link
+              key={i.id}
+              href={`/ideas/${i.slug}`}
+              className="rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-white/20 hover:bg-white/10"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs tracking-widest text-white/50">{i.ticker}</div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    i.direction === "long"
+                      ? "bg-emerald-500/15 text-emerald-300"
+                      : "bg-red-500/15 text-red-300"
+                  }`}
+                >
+                  {i.direction.toUpperCase()}
+                </span>
+              </div>
+
+              <div className="mt-3 text-lg font-semibold leading-snug">
+                {i.title}
+              </div>
+
+              {i.teaser ? (
+                <p className="mt-2 text-sm text-white/70 line-clamp-2">{i.teaser}</p>
+              ) : null}
+
+              <div className="mt-4 text-xs text-white/40">
+                {new Date(i.created_at).toLocaleString()}
+              </div>
+            </Link>
+          ))}
+
+          {!errorMsg && recent.length === 0 && (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
+              No published ideas yet.
+            </div>
+          )}
         </div>
       </section>
-    </div>
+    </main>
   );
 }

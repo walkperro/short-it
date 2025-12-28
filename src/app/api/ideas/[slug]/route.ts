@@ -1,85 +1,68 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { canAccess } from "@/lib/entitlements";
 
 export const runtime = "nodejs";
 
 type Plan = "free" | "ideas" | "conviction" | "macro";
 
-function normalizePlan(v: any): Plan {
-  if (v === "ideas" || v === "conviction" || v === "macro") return v;
-  return "free";
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+function isAdminEmail(email?: string | null) {
+  const allow = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return !!email && allow.includes(email.toLowerCase());
+}
+
+// simple plan resolver for now (replace later with Stripe entitlements)
+function planFromEmail(email?: string | null): Plan {
+  if (!email) return "free";
+  return "ideas";
 }
 
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<{ slug: string }> }
-): Promise<Response> {
-  try {
-    const { slug } = await context.params;
+) {
+  const { slug } = await context.params;
 
-    // Who is viewing?
-    const supabase = await createSupabaseServerClient();
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData.user ?? null;
+  // Viewer (cookie session)
+  const supabase = await createSupabaseServerClient();
+  const { data: auth } = await supabase.auth.getUser();
+  const email = auth?.user?.email ?? null;
 
-    let viewerPlan: Plan = "free";
-    let isAdmin = false;
+  const viewer = {
+    email,
+    is_admin: isAdminEmail(email),
+    plan: planFromEmail(email),
+  };
 
-    if (user) {
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("plan,is_admin")
-        .eq("id", user.id)
-        .maybeSingle();
+  // Build query first (do NOT call maybeSingle yet)
+  let q = supabaseAdmin.from("ideas").select("*").eq("slug", slug);
+  if (!viewer.is_admin) q = q.eq("status", "published");
 
-      viewerPlan = normalizePlan(profile?.plan);
-      isAdmin = !!profile?.is_admin;
-    }
+  const { data, error } = await q.maybeSingle();
 
-    // Always pull from ideas (admin client), but only published content:
-    const { data: idea, error } = await supabaseAdmin
-      .from("ideas")
-      .select(
-        "id,slug,title,ticker,direction,teaser,summary,conviction,macro_context,created_at,published_at,status"
-      )
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (!idea) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-    // Only show published ideas publicly (admin can still view drafts via /admin list)
-    if (idea.status !== "published" && !isAdmin) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-
-    // Gate fields server-side
-    const out: any = { ...idea };
-
-    if (!isAdmin) {
-      // Ideas (LEVEL I) locked unless plan >= ideas
-      if (viewerPlan === "free") {
-        out.summary = null;
-        out.conviction = null;
-        out.macro_context = null;
-      }
-
-      // Conviction (LEVEL II) locked unless plan >= conviction
-      if (viewerPlan !== "conviction" && viewerPlan !== "macro") {
-        out.conviction = null;
-      }
-
-      // Macro (LEVEL III) locked unless macro
-      if (viewerPlan !== "macro") {
-        out.macro_context = null;
-      }
-    }
-
-    return NextResponse.json(
-      { data: out, viewer: { plan: viewerPlan, is_admin: isAdmin } },
-      { status: 200 }
-    );
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 500 });
+  if (error) {
+    return NextResponse.json({ ok: false, viewer, error: error.message }, { status: 500 });
   }
+  if (!data) {
+    return NextResponse.json({ ok: false, viewer, error: "Not found" }, { status: 404 });
+  }
+
+  // Optional server-side gating (keeps UI honest)
+  if (!viewer.is_admin) {
+    const allowed = canAccess(viewer.plan as any, "ideas" as any);
+    if (!allowed) {
+      return NextResponse.json({ ok: false, viewer, error: "Upgrade required" }, { status: 402 });
+    }
+  }
+
+  return NextResponse.json({ ok: true, viewer, data });
 }

@@ -1,22 +1,22 @@
-import "./globals.css";
 import type { Metadata } from "next";
-import { AuthProvider } from "@/components/auth/AuthProvider";
+import "./globals.css";
 import SiteHeader from "@/components/site-header";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 import DisclaimerGate from "@/components/DisclaimerGate";
 
 export const metadata: Metadata = {
   title: "SHORT-IT",
-  description: "Trade ideas. Not financial advice.",
+  description: "Trade intel. Clean. Tiered.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-black text-white antialiased">
+      <body className="min-h-screen bg-black text-white">
         <AuthProvider>
-          <SiteHeader />
           <DisclaimerGate>
-            <main className="mx-auto w-full max-w-5xl px-4 pb-16 pt-8">{children}</main>
+            <SiteHeader />
+            {children}
           </DisclaimerGate>
         </AuthProvider>
       </body>

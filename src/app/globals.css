@@ -57,3 +57,13 @@ body {
     transform: scale(0.985);
   }
 }
+
+
+/* micro animation */
+@keyframes shortit-enter-pop {
+  0% { transform: translateY(6px) scale(0.98); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.shortit-enter-pop {
+  animation: shortit-enter-pop 220ms ease-out;
+}

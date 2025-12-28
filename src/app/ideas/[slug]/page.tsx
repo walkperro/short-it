@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import LockedSection from "@/components/LockedSection";
 
 async function getBaseUrl() {
@@ -11,79 +11,94 @@ async function getBaseUrl() {
 }
 
 export default async function IdeaPage({ params }: { params: { slug: string } }) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (await getBaseUrl());
+  const base = await getBaseUrl();
+  const cookieHeader = cookies().toString();
 
-  const res = await fetch(`${baseUrl}/api/ideas/${params.slug}`, {
+  const res = await fetch(`${base}/api/ideas/${params.slug}`, {
     cache: "no-store",
+    headers: {
+      cookie: cookieHeader,
+    },
   });
 
-  if (!res.ok) {
+  const json = await res.json().catch(() => null);
+  const idea = json?.data;
+
+  if (!res.ok || !idea) {
     return (
-      <div className="mx-auto max-w-3xl p-6 text-white">
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-100">
-          This idea couldn&apos;t be loaded.
+      <main className="mx-auto max-w-4xl px-4 py-10">
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-white/90">
+          This idea couldn't be loaded.
         </div>
         <div className="mt-4">
-          <Link className="underline text-white/80" href="/ideas">
+          <Link className="text-white/70 underline underline-offset-4 hover:text-white" href="/ideas">
             Back to Ideas
           </Link>
         </div>
-      </div>
+      </main>
     );
   }
 
-  const json = await res.json().catch(() => ({} as any));
-  const idea = json?.data ?? {};
-  const viewer = json?.viewer ?? { plan: "free", is_admin: false };
-
-  const isAdmin = !!viewer.is_admin;
-  const plan = viewer.plan ?? "free";
-
-  const lockIdeas = !isAdmin && plan === "free";
-  const lockConviction = !isAdmin && plan !== "conviction" && plan !== "macro";
-  const lockMacro = !isAdmin && plan !== "macro";
+  const userPlan = json?.viewer?.plan ?? "free";
+  const isAdmin = json?.viewer?.is_admin ?? false;
 
   return (
-    <main className="mx-auto max-w-3xl p-6 text-white">
-      <div className="mb-6">
-        <Link className="text-white/70 underline" href="/ideas">
-          ← Back
+    <main className="mx-auto max-w-4xl px-4 py-10">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-xs tracking-widest text-white/50">{idea.ticker} • {idea.direction?.toUpperCase?.() ?? ""}</div>
+          <h1 className="mt-2 text-3xl font-semibold text-white">{idea.title}</h1>
+          {idea.teaser ? <p className="mt-3 text-white/70">{idea.teaser}</p> : null}
+        </div>
+
+        <Link
+          href="/subscribe"
+          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10"
+        >
+          View plans
         </Link>
       </div>
 
-      <h1 className="text-3xl font-semibold">{idea.title}</h1>
-      <div className="mt-2 text-sm text-white/60">
-        {idea.ticker} • {idea.direction?.toUpperCase?.() ?? idea.direction}
-      </div>
+      <div className="mt-8 grid gap-6">
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
+          <div className="text-xs tracking-widest text-white/50">LEVEL I</div>
+          <h2 className="mt-2 text-lg font-semibold text-white">Idea Thesis</h2>
+          <div className="prose prose-invert mt-3 max-w-none text-white/80">
+            <p className="whitespace-pre-wrap">{idea.summary}</p>
+          </div>
+        </section>
 
-      <div className="mt-6 space-y-6">
-        {idea.teaser ? (
+        <LockedSection
+          locked={!isAdmin && userPlan !== "conviction" && userPlan !== "macro"}
+          label="Conviction"
+        >
           <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <h2 className="mb-2 text-sm font-semibold text-white/70">Teaser</h2>
-            <p className="whitespace-pre-wrap leading-relaxed text-white/90">{idea.teaser}</p>
-          </section>
-        ) : null}
-
-        <LockedSection locked={lockIdeas} label="Idea Thesis (LEVEL I)">
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <h2 className="mb-2 text-sm font-semibold text-white/70">Idea Thesis (LEVEL I)</h2>
-            <p className="whitespace-pre-wrap leading-relaxed text-white/90">{idea.summary}</p>
-          </section>
-        </LockedSection>
-
-        <LockedSection locked={lockConviction} label="Conviction (LEVEL II)">
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <h2 className="mb-2 text-sm font-semibold text-white/70">Conviction (LEVEL II)</h2>
-            <p className="whitespace-pre-wrap leading-relaxed text-white/90">{idea.conviction}</p>
+            <div className="text-xs tracking-widest text-white/50">LEVEL II</div>
+            <h2 className="mt-2 text-lg font-semibold text-white">Conviction</h2>
+            <div className="prose prose-invert mt-3 max-w-none text-white/80">
+              <p className="whitespace-pre-wrap">{idea.conviction}</p>
+            </div>
           </section>
         </LockedSection>
 
-        <LockedSection locked={lockMacro} label="Macro (LEVEL III)">
+        <LockedSection
+          locked={!isAdmin && userPlan !== "macro"}
+          label="Macro"
+        >
           <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <h2 className="mb-2 text-sm font-semibold text-white/70">Macro (LEVEL III)</h2>
-            <p className="whitespace-pre-wrap leading-relaxed text-white/90">{idea.macro_context}</p>
+            <div className="text-xs tracking-widest text-white/50">LEVEL III</div>
+            <h2 className="mt-2 text-lg font-semibold text-white">Macro</h2>
+            <div className="prose prose-invert mt-3 max-w-none text-white/80">
+              <p className="whitespace-pre-wrap">{idea.macro_context}</p>
+            </div>
           </section>
         </LockedSection>
+
+        <div className="pt-2">
+          <Link className="text-white/60 underline underline-offset-4 hover:text-white" href="/ideas">
+            Back to Ideas
+          </Link>
+        </div>
       </div>
     </main>
   );
