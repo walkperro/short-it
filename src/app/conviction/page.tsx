@@ -71,7 +71,7 @@ export default async function ConvictionPage() {
   }
 
   const four = items.slice(0, 4);
-  const allowed = isAdmin || canAccess(plan, "conviction");
+  const allowed = isAdmin || canAccess("conviction", plan);
 
   return (
     <main className="mx-auto max-w-6xl p-6 text-white">

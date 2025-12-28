@@ -9,13 +9,51 @@ import { levelLabelFromPlan, normalizePlan } from "@/lib/entitlements";
 type Me = {
   user: { id: string; email?: string | null } | null;
   is_admin?: boolean;
-  plan?: "free" | "ideas" | "conviction" | "macro" | string;
+  plan?: "free" | "ideas" | "conviction" | "macro";
 };
 
-function initials(email?: string | null) {
-  const e = (email ?? "").trim();
-  if (!e) return "U";
-  return e[0].toUpperCase();
+function initials(email: string | null) {
+  if (!email) return "U";
+  const s = email.split("@")[0] || "U";
+  return (s[0] || "U").toUpperCase();
+}
+
+async function fetchMe(): Promise<Me | null> {
+  try {
+    const res = await fetch("/api/me", { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as Me;
+  } catch {
+    return null;
+  }
+}
+
+function badgeShortFromPlan(plan: Me["plan"]) {
+  const p = normalizePlan(plan ?? "free");
+  if (p === "ideas") return "I";
+  if (p === "conviction") return "II";
+  if (p === "macro") return "III";
+  return "FREE";
+}
+
+function MenuLink({
+  href,
+  onNavigate,
+  children,
+}: {
+  href: string;
+  onNavigate: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className="block rounded-xl px-3 py-2 text-sm text-white/85 hover:bg-white/10"
+    >
+      {children}
+    </Link>
+  );
 }
 
 export default function UserMenu() {
@@ -24,23 +62,13 @@ export default function UserMenu() {
   const [me, setMe] = useState<Me | null>(null);
 
   useEffect(() => {
-    setOpen(false); // retract on navigation
+    fetchMe().then(setMe);
   }, [pathname]);
 
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/me", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((j) => alive && setMe(j))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   const isAuthed = !!me?.user;
-  const plan = normalizePlan(me?.plan);
-  const badge = me?.is_admin ? { short: "A", long: "ADMIN" } : levelLabelFromPlan(plan);
+  const plan = normalizePlan(me?.plan ?? "free");
+  const levelLong = levelLabelFromPlan(plan);
+  const badgeShort = badgeShortFromPlan(plan);
 
   function close() {
     setOpen(false);
@@ -57,7 +85,7 @@ export default function UserMenu() {
 
         {/* Level badge */}
         <span className="absolute -bottom-1 -right-1 rounded-full border border-black/60 bg-brand-red px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-          {badge.short}
+          {badgeShort}
         </span>
       </button>
 
@@ -71,8 +99,12 @@ export default function UserMenu() {
             className="absolute right-0 mt-3 w-56 overflow-hidden rounded-2xl border border-white/10 bg-black/90 backdrop-blur-xl"
           >
             <div className="px-3 py-3">
-              <div className="text-xs tracking-widest text-white/50">{me?.is_admin ? "ADMIN" : badge.long}</div>
-              <div className="mt-1 truncate text-sm text-white/90">{me?.user?.email ?? "Not signed in"}</div>
+              <div className="text-xs tracking-widest text-white/50">
+                {me?.is_admin ? "ADMIN" : levelLong}
+              </div>
+              <div className="mt-1 truncate text-sm text-white/90">
+                {me?.user?.email ?? "Not signed in"}
+              </div>
             </div>
 
             <div className="h-px bg-white/10" />
@@ -81,21 +113,27 @@ export default function UserMenu() {
               <MenuLink href="/plans" onNavigate={close}>
                 Plans
               </MenuLink>
+
               {isAuthed ? (
                 <>
                   <MenuLink href="/account" onNavigate={close}>
                     Account
                   </MenuLink>
-                  <MenuLink href="/admin" onNavigate={close}>
-                    Admin
-                  </MenuLink>
+
+                  {/* HIDE ADMIN COMPLETELY UNLESS ADMIN */}
+                  {me?.is_admin ? (
+                    <MenuLink href="/admin" onNavigate={close}>
+                      Admin
+                    </MenuLink>
+                  ) : null}
+
                   <button
                     onClick={async () => {
+                      await fetch("/api/logout", { method: "POST" });
                       close();
-                      await fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
-                      location.href = "/";
+                      window.location.href = "/login";
                     }}
-                    className="mt-1 w-full rounded-xl px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10"
+                    className="w-full rounded-xl px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10"
                   >
                     Sign out
                   </button>
@@ -110,25 +148,5 @@ export default function UserMenu() {
         ) : null}
       </AnimatePresence>
     </div>
-  );
-}
-
-function MenuLink({
-  href,
-  children,
-  onNavigate,
-}: {
-  href: string;
-  children: React.ReactNode;
-  onNavigate: () => void;
-}) {
-  return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      className="block rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-    >
-      {children}
-    </Link>
   );
 }

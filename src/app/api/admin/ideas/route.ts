@@ -1,85 +1,100 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-function slugify(input: string) {
-  return String(input ?? "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
 async function requireAdmin() {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
-  if (!user) return { ok: false as const, status: 401, error: "Not signed in" };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, user: null };
 
-  const { data: profile } = await supabaseAdmin
+  const { data: prof } = await supabaseAdmin
     .from("profiles")
     .select("is_admin")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile?.is_admin) return { ok: false as const, status: 403, error: "Not authorized" };
-  return { ok: true as const, userId: user.id };
+  if (!prof?.is_admin) return { ok: false as const, user: null };
+  return { ok: true as const, user };
 }
 
-export async function GET() {
-  const auth = await requireAdmin();
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+function slugify(s: string) {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 64);
+}
 
-  const { data, error } = await supabaseAdmin
+export async function GET(req: Request) {
+  const admin = await requireAdmin();
+  if (!admin.ok) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+
+  const url = new URL(req.url);
+  const status = url.searchParams.get("status"); // "draft" or "published"
+
+  let q = supabaseAdmin
     .from("ideas")
-    .select("id,slug,title,ticker,direction,status,created_at,published_at")
+    .select(
+      "id,slug,idea_no,created_at,published_at,status,locked,kind,ticker,direction,entry,reach,option_side,context"
+    )
     .order("created_at", { ascending: false });
 
+  if (status === "draft" || status === "published") q = q.eq("status", status);
+
+  const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+  return NextResponse.json({ data: data ?? [] });
 }
 
-export async function POST(req: NextRequest) {
-  const auth = await requireAdmin();
-  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+export async function POST(req: Request) {
+  const admin = await requireAdmin();
+  if (!admin.ok) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
 
-  const title = String(body.title ?? "").trim();
-  const ticker = String(body.ticker ?? "").toUpperCase().trim();
+  const ticker = String(body?.ticker || "").trim().toUpperCase();
+  const kind = body?.kind ? String(body.kind) : null;
+  const direction = body?.direction ? String(body.direction) : null;
+  const entry = body?.entry ?? null;
+  const reach = body?.reach ?? null;
+  const option_side = body?.option_side ? String(body.option_side) : null;
+  const context = body?.context ? String(body.context) : null;
+  const locked = !!body?.locked;
+  const status: "draft" | "published" = body?.status === "published" ? "published" : "draft";
 
-  // Guarantee slug
-  let slug = String(body.slug ?? "").trim();
-  if (!slug) {
-    const base = slugify(`${ticker || "idea"}-${title || "draft"}`) || "idea";
-    slug = `${base}-${Math.random().toString(36).slice(2, 7)}`;
-  } else {
-    slug = slugify(slug);
-  }
+  if (!ticker) return NextResponse.json({ error: "Ticker required" }, { status: 400 });
 
-  const status = body.status === "published" ? "published" : "draft";
+  const baseSlug = slugify(`${ticker}-${Date.now()}`);
   const published_at = status === "published" ? new Date().toISOString() : null;
 
-  const payload: any = {
-    slug,
-    title,
-    ticker,
-    direction: body.direction ?? "long",
-    start_date: body.start_date || null,
-    end_date: body.end_date || null,
-    target_price: Number(body.target_price) || null,
-    teaser: body.teaser ?? null,
-    summary: body.summary ?? null,
-    conviction: body.conviction ?? null,
-    macro_context: body.macro_context ?? null,
-    status,
-    author_id: auth.userId,
-    published_at,
-  };
+  const { data, error } = await supabaseAdmin
+    .from("ideas")
+    .insert([
+      {
+        slug: baseSlug,
+        ticker,
+        kind,
+        direction,
+        entry,
+        reach,
+        option_side,
+        context,
+        locked,
+        status,
+        published_at,
+        author_id: admin.user.id,
+        // keep legacy fields in place (optional)
+        title: `Idea ${ticker}`,
+        teaser: context,
+      },
+    ])
+    .select("id,slug,idea_no,created_at,published_at,status,locked,kind,ticker,direction,entry,reach,option_side,context")
+    .single();
 
-  const { data, error } = await supabaseAdmin.from("ideas").insert(payload).select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
   return NextResponse.json({ data });
 }

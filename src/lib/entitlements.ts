@@ -1,27 +1,48 @@
 export type Plan = "free" | "ideas" | "conviction" | "macro";
+export type Section = "ideas" | "conviction" | "macro";
 
-const RANK: Record<Plan, number> = {
-  free: 0,
-  ideas: 1,
-  conviction: 2,
-  macro: 3,
-};
-
-export function normalizePlan(p: any): Plan {
-  const v = String(p ?? "free").toLowerCase();
-  if (v === "ideas" || v === "conviction" || v === "macro") return v;
+export function normalizePlan(input: any): Plan {
+  const s = String(input ?? "").toLowerCase();
+  if (s === "macro") return "macro";
+  if (s === "conviction") return "conviction";
+  if (s === "ideas") return "ideas";
   return "free";
 }
 
-export function canAccess(userPlan: any, required: Plan): boolean {
-  const up = normalizePlan(userPlan);
-  return (RANK[up] ?? 0) >= (RANK[required] ?? 0);
+export function levelLabelFromPlan(plan: Plan) {
+  if (plan === "ideas") return "LEVEL I";
+  if (plan === "conviction") return "LEVEL II";
+  if (plan === "macro") return "LEVEL III";
+  return "FREE";
 }
 
-export function levelLabelFromPlan(userPlan: any): { short: string; long: string } {
-  const p = normalizePlan(userPlan);
-  if (p === "macro") return { short: "III", long: "LEVEL III" };
-  if (p === "conviction") return { short: "II", long: "LEVEL II" };
-  if (p === "ideas") return { short: "I", long: "LEVEL I" };
-  return { short: "—", long: "FREE" };
+export function planDisplay(plan: Plan) {
+  if (plan === "ideas") return `Ideas (${levelLabelFromPlan(plan)})`;
+  if (plan === "conviction") return `Conviction (${levelLabelFromPlan(plan)})`;
+  if (plan === "macro") return `Macro (${levelLabelFromPlan(plan)})`;
+  return "Free";
+}
+
+/**
+ * canAccess supports BOTH call orders:
+ *  - canAccess(plan, section)
+ *  - canAccess(section, plan)
+ */
+export function canAccess(a: Plan | Section, b: Plan | Section) {
+  let plan: Plan;
+  let section: Section;
+
+  if (a === "ideas" || a === "conviction" || a === "macro") {
+    section = a;
+    plan = normalizePlan(b);
+  } else {
+    plan = normalizePlan(a);
+    section = b as Section;
+  }
+
+  if (plan === "macro") return true;
+  if (plan === "conviction") return section !== "macro";
+  if (plan === "ideas") return section === "ideas";
+  // free users can only see Ideas (teaser/locked UI handles the rest)
+  return section === "ideas";
 }
