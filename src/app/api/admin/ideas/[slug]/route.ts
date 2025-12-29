@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -26,14 +26,13 @@ function isOptionKind(kind: string | null) {
   return kind === "Buy Option" || kind === "Sell Option";
 }
 
-export async function PUT(req: Request, ctx: { params: { slug: string } }) {
+export async function PUT(req: Request, context: { params: Promise<{ slug: string }> }) {
   const admin = await requireAdmin();
   if (!admin.ok) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
-  const slug = ctx.params.slug;
+  const { slug } = await context.params;
   const body = await req.json().catch(() => ({}));
 
-  // Load existing row so we can decide when to set published_at, etc.
   const { data: existing, error: exErr } = await supabaseAdmin
     .from("ideas")
     .select("id,status,published_at,kind,start_date")
@@ -45,7 +44,6 @@ export async function PUT(req: Request, ctx: { params: { slug: string } }) {
 
   const kind = body?.kind ? String(body.kind) : null;
   const option = isOptionKind(kind);
-
   const nowIso = new Date().toISOString();
 
   const nextStatus: "draft" | "published" | null =
@@ -54,38 +52,27 @@ export async function PUT(req: Request, ctx: { params: { slug: string } }) {
   const patch: any = {};
 
   if (typeof body?.locked === "boolean") patch.locked = body.locked;
-
   if (kind != null) patch.kind = kind;
-
   if (body?.ticker != null) patch.ticker = String(body.ticker).trim().toUpperCase();
 
-  // Only allow direction when NOT option
   if (body?.direction !== undefined) patch.direction = option ? null : body.direction;
-
   if (body?.entry !== undefined) patch.entry = body.entry;
   if (body?.reach !== undefined) patch.reach = body.reach;
 
-  // Only allow option_side when option
   if (body?.option_side !== undefined) patch.option_side = option ? body.option_side : null;
-
   if (body?.context !== undefined) patch.context = body.context;
 
-  // Strike/Exp: option only
+  // Strike/Exp: option-only
   if (body?.strike !== undefined) patch.strike = option ? body.strike : null;
-  if (body?.exp !== undefined) patch.exp = option ? body.exp : null;
 
-  // Status transitions
+  // exp is DATE column now; accept "YYYY-MM-DD" string or null
+  if (body?.exp !== undefined) patch.exp = option ? (body.exp || null) : null;
+
   if (nextStatus) {
     patch.status = nextStatus;
-
-    // If publishing now and published_at not set, set it
-    if (nextStatus === "published" && !existing.published_at) {
-      patch.published_at = nowIso;
-    }
-    // If moving back to draft, keep published_at as-is (optional: null it; but we keep history)
+    if (nextStatus === "published" && !existing.published_at) patch.published_at = nowIso;
   }
 
-  // Legacy NOT NULL safety: ensure start_date always present
   if (!existing.start_date) patch.start_date = nowIso;
 
   const { data, error } = await supabaseAdmin
@@ -101,11 +88,11 @@ export async function PUT(req: Request, ctx: { params: { slug: string } }) {
   return NextResponse.json({ data });
 }
 
-export async function DELETE(_req: Request, ctx: { params: { slug: string } }) {
+export async function DELETE(_req: Request, context: { params: Promise<{ slug: string }> }) {
   const admin = await requireAdmin();
   if (!admin.ok) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
-  const slug = ctx.params.slug;
+  const { slug } = await context.params;
 
   const { error } = await supabaseAdmin.from("ideas").delete().eq("slug", slug);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -83,6 +83,8 @@ export default function AdminClient() {
     setDirection("long");
     setEntry("");
     setReach("");
+    setStrike("");
+    setExp("");
     setOptionSide("call");
     setStrike("");
     setExp("");
@@ -338,7 +340,39 @@ export default function AdminClient() {
             />
           </Field>
 
-          {/* OPTION-ONLY FIELDS */}
+          
+          {/* OPTIONS ONLY: Strike + Exp */}
+          <Field label="Strike (options only)">
+            <input
+              value={strike}
+              onChange={(e) => setStrike(e.target.value)}
+              inputMode="decimal"
+              placeholder="500"
+              disabled={!isOption}
+              className={[
+                "w-full rounded-2xl border px-4 py-3 outline-none",
+                !isOption
+                  ? "border-white/5 bg-black/20 text-white/30"
+                  : "border-white/10 bg-black/40 text-white focus:border-white/20",
+              ].join(" ")}
+            />
+          </Field>
+
+          <Field label="Exp (options only)">
+            <input
+              type="date"
+              value={exp}
+              onChange={(e) => setExp(e.target.value)}
+              disabled={!isOption}
+              className={[
+                "w-full rounded-2xl border px-4 py-3 outline-none",
+                !isOption
+                  ? "border-white/5 bg-black/20 text-white/30"
+                  : "border-white/10 bg-black/40 text-white focus:border-white/20",
+              ].join(" ")}
+            />
+          </Field>
+{/* OPTION-ONLY FIELDS */}
           <Field label="STRIKE (options only)">
             <input
               value={strike}
@@ -407,14 +441,14 @@ export default function AdminClient() {
         </div>
 
         <div className="mt-5 flex flex-col gap-3 md:flex-row">
-          <button
+          <button type="button"
             disabled={busy}
             onClick={() => save("draft")}
             className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 disabled:opacity-60"
           >
             Save to drafts
           </button>
-          <button
+          <button type="button"
             disabled={busy}
             onClick={() => save("published")}
             className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-60"
