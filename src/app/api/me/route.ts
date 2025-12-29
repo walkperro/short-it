@@ -1,36 +1,56 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
+import { isAdminEmail } from "@/lib/admin";
 import { normalizePlan } from "@/lib/entitlements";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-function isAdminEmail(email?: string | null) {
-  const allow = (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  return !!email && allow.includes(email.toLowerCase());
-}
-
 export async function GET() {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getUser();
-  const user = data.user ?? null;
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Not signed in
   if (!user) {
-    return NextResponse.json({ user: null, is_admin: false, plan: "free" }, { status: 200 });
+    return NextResponse.json(
+      { user: null, plan: "free", is_admin: false, profile: null },
+      { status: 200 }
+    );
   }
 
-  const email = user.email ?? null;
-
-  const { data: profile } = await supabaseAdmin
+  // Read user profile (RLS should allow self-select)
+  const { data: profile } = await supabase
     .from("profiles")
     .select("plan,is_admin")
     .eq("id", user.id)
     .maybeSingle();
 
-  const plan = normalizePlan(profile?.plan);
-  const is_admin = Boolean(profile?.is_admin) || isAdminEmail(email);
+  const plan = normalizePlan((profile?.plan as any) ?? "free");
+  const email = user.email ?? null;
 
-  return NextResponse.json({ user: { id: user.id, email }, is_admin, plan }, { status: 200 });
+  const allowlisted = isAdminEmail(email);
+  const is_admin = Boolean(profile?.is_admin) || allowlisted;
+
+  // 3B: If email is allowlisted but profile isn't marked yet, mark it now (service role)
+  if (allowlisted && !profile?.is_admin) {
+    await supabaseAdmin.from("profiles").upsert({
+      id: user.id,
+      plan,
+      is_admin: true,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  return NextResponse.json(
+    {
+      user,
+      plan,
+      is_admin,
+      profile: { plan, is_admin },
+    },
+    { status: 200 }
+  );
 }

@@ -20,6 +20,8 @@ type AdminIdea = {
   entry: number | null;
   reach: number | null;
   option_side: "call" | "put" | null;
+  strike: number | null;
+  exp: string | null;
   context: string | null;
 };
 
@@ -59,7 +61,6 @@ export default function AdminClient() {
   const [published, setPublished] = useState<AdminIdea[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-
   const [editing, setEditing] = useState<AdminIdea | null>(null);
 
   const [kind, setKind] = useState<IdeaKind>("Equity");
@@ -68,6 +69,8 @@ export default function AdminClient() {
   const [entry, setEntry] = useState<string>("");
   const [reach, setReach] = useState<string>("");
   const [optionSide, setOptionSide] = useState<"call" | "put">("call");
+  const [strike, setStrike] = useState<string>("");
+  const [exp, setExp] = useState<string>(""); // YYYY-MM-DD
   const [locked, setLocked] = useState(false);
   const [context, setContext] = useState("");
 
@@ -81,6 +84,8 @@ export default function AdminClient() {
     setEntry("");
     setReach("");
     setOptionSide("call");
+    setStrike("");
+    setExp("");
     setLocked(false);
     setContext("");
   }
@@ -108,8 +113,25 @@ export default function AdminClient() {
     return Number.isFinite(n) ? n : null;
   }
 
+  function validate() {
+    const t = ticker.trim().toUpperCase();
+    if (!t) return "Ticker is required.";
+
+    if (isOption) {
+      if (!strike.trim()) return "Strike is required for options.";
+      if (!exp.trim()) return "EXP is required for options (YYYY-MM-DD).";
+    }
+    return null;
+  }
+
   async function save(status: "draft" | "published") {
     setMsg(null);
+
+    const err = validate();
+    if (err) {
+      setMsg({ kind: "err", text: err });
+      return;
+    }
 
     const payload = {
       status,
@@ -120,13 +142,10 @@ export default function AdminClient() {
       entry: toNumberOrNull(entry),
       reach: toNumberOrNull(reach),
       option_side: isOption ? optionSide : null,
+      strike: isOption ? toNumberOrNull(strike) : null,
+      exp: isOption ? exp.trim() : null,
       context: context.trim(),
     };
-
-    if (!payload.ticker) {
-      setMsg({ kind: "err", text: "Ticker is required." });
-      return;
-    }
 
     setBusy(true);
     try {
@@ -161,6 +180,8 @@ export default function AdminClient() {
     setEntry(i.entry == null ? "" : String(i.entry));
     setReach(i.reach == null ? "" : String(i.reach));
     setOptionSide((i.option_side as any) || "call");
+    setStrike(i.strike == null ? "" : String(i.strike));
+    setExp(i.exp || "");
     setLocked(!!i.locked);
     setContext(i.context || "");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -198,14 +219,20 @@ export default function AdminClient() {
     }
   }
 
+  // If kind switches away from option, clear strike/exp (and UI disables them)
+  useEffect(() => {
+    if (!isOption) {
+      setStrike("");
+      setExp("");
+    }
+  }, [isOption]);
+
   return (
     <main className="mx-auto max-w-6xl p-6 text-white">
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Admin</h1>
-          <p className="mt-1 text-sm text-white/60">
-            Create Ideas, save to drafts, publish, lock/unlock, edit, delete.
-          </p>
+          <p className="mt-1 text-sm text-white/60">Create Ideas, save to drafts, publish, lock/unlock, edit, delete.</p>
         </div>
         <button
           onClick={load}
@@ -228,7 +255,6 @@ export default function AdminClient() {
         </div>
       ) : null}
 
-      {/* CREATE / EDIT */}
       <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
         <div className="flex items-center justify-between">
           <div className="text-lg font-semibold">
@@ -312,6 +338,38 @@ export default function AdminClient() {
             />
           </Field>
 
+          {/* OPTION-ONLY FIELDS */}
+          <Field label="STRIKE (options only)">
+            <input
+              value={strike}
+              onChange={(e) => setStrike(e.target.value)}
+              inputMode="decimal"
+              placeholder="e.g. 500"
+              disabled={!isOption}
+              className={[
+                "w-full rounded-2xl border px-4 py-3 outline-none",
+                !isOption
+                  ? "border-white/5 bg-black/20 text-white/30"
+                  : "border-white/10 bg-black/40 text-white focus:border-white/20",
+              ].join(" ")}
+            />
+          </Field>
+
+          <Field label="EXP (options only)">
+            <input
+              value={exp}
+              onChange={(e) => setExp(e.target.value)}
+              placeholder="YYYY-MM-DD"
+              disabled={!isOption}
+              className={[
+                "w-full rounded-2xl border px-4 py-3 outline-none",
+                !isOption
+                  ? "border-white/5 bg-black/20 text-white/30"
+                  : "border-white/10 bg-black/40 text-white focus:border-white/20",
+              ].join(" ")}
+            />
+          </Field>
+
           <div className="md:col-span-2">
             <label className="text-xs tracking-widest text-white/50">Context</label>
             <textarea
@@ -334,9 +392,7 @@ export default function AdminClient() {
               onClick={() => setLocked((v) => !v)}
               className={[
                 "h-9 w-16 rounded-full border transition",
-                locked
-                  ? "border-emerald-500/30 bg-emerald-500/20"
-                  : "border-white/10 bg-white/5 hover:bg-white/10",
+                locked ? "border-emerald-500/30 bg-emerald-500/20" : "border-white/10 bg-white/5 hover:bg-white/10",
               ].join(" ")}
               aria-label="Toggle locked"
             >
@@ -368,11 +424,7 @@ export default function AdminClient() {
         </div>
       </div>
 
-      {/* DRAFTS */}
-      <Section
-        title={`Drafts (${drafts.length})`}
-        subtitle="Edit these later or publish when ready."
-      >
+      <Section title={`Drafts (${drafts.length})`} subtitle="Edit these later or publish when ready.">
         {drafts.length ? (
           <div className="space-y-3">
             {drafts.map((i) => (
@@ -391,11 +443,7 @@ export default function AdminClient() {
         )}
       </Section>
 
-      {/* PUBLISHED */}
-      <Section
-        title={`Published (${published.length})`}
-        subtitle="Live ideas shown on the Ideas page."
-      >
+      <Section title={`Published (${published.length})`} subtitle="Live ideas shown on the Ideas page.">
         {published.length ? (
           <div className="space-y-3">
             {published.map((i) => (
@@ -426,7 +474,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+function Section({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="mt-8">
       <div className="flex items-end justify-between">
@@ -441,7 +497,11 @@ function Section({ title, subtitle, children }: { title: string; subtitle: strin
 }
 
 function Empty({ text }: { text: string }) {
-  return <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">{text}</div>;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
+      {text}
+    </div>
+  );
 }
 
 function Row({
@@ -471,22 +531,20 @@ function Row({
           <div className="mt-2 text-sm text-white/80">
             {isOption ? (
               <>
-                <span className="font-semibold">{(idea.option_side || "—").toUpperCase()}</span>{" "}
-                • Entry: {idea.entry ?? "—"} • Reach: {idea.reach ?? "—"}
+                <span className="font-semibold">{(idea.option_side || "—").toUpperCase()}</span> • Strike:{" "}
+                {idea.strike ?? "—"} • Exp: {idea.exp ?? "—"} • Entry: {idea.entry ?? "—"} • Reach:{" "}
+                {idea.reach ?? "—"}
               </>
             ) : (
               <>
-                <span className="font-semibold">{(idea.direction || "—").toUpperCase()}</span>{" "}
-                • Entry: {idea.entry ?? "—"} • Reach: {idea.reach ?? "—"}
+                <span className="font-semibold">{(idea.direction || "—").toUpperCase()}</span> • Entry:{" "}
+                {idea.entry ?? "—"} • Reach: {idea.reach ?? "—"}
               </>
-            )}
-            {" "}
+            )}{" "}
             • {idea.locked ? <span className="text-brand-red font-semibold">LOCKED</span> : "Unlocked"}
           </div>
 
-          {idea.context ? (
-            <div className="mt-2 line-clamp-2 text-sm text-white/70">{idea.context}</div>
-          ) : null}
+          {idea.context ? <div className="mt-2 line-clamp-2 text-sm text-white/70">{idea.context}</div> : null}
         </div>
 
         <div className="flex gap-2">
