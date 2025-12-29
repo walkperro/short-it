@@ -5,11 +5,21 @@ import { getRequestBaseUrl } from "@/lib/server-url";
 type Idea = {
   id: string;
   slug: string;
-  title: string;
-  ticker: string;
-  direction: "long" | "short";
-  teaser?: string | null;
+  idea_no?: number | null;
+  status?: string;
+  locked?: boolean;
   created_at: string;
+  published_at?: string | null;
+  kind?: string | null;
+  ticker: string;
+  direction?: "long" | "short" | null;
+  entry?: string | null;
+  reach?: string | null;
+  option_side?: "call" | "put" | null;
+  strike?: string | null;
+  exp?: string | null;
+  context?: string | null;
+  teaser?: string | null;
 };
 
 async function getBaseUrl() {
@@ -122,7 +132,7 @@ export default async function IdeasPage() {
                       : "bg-red-500/15 text-red-400"
                   }`}
                 >
-                  {i.direction.toUpperCase()}
+                  {(i.direction ?? i.option_side ?? "—").toUpperCase()}
                 </span>
               </div>
 
@@ -132,10 +142,10 @@ export default async function IdeasPage() {
 
               <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3">
                 <Field label="Ticker" value={i.ticker || "—"} strong />
-                <Field label="Type" value="—" />
-                <Field label="Direction" value={i.direction.toUpperCase()} strong />
-                <Field label="Entry" value="—" />
-                <Field label="Reach" value="—" />
+                <Field label="Type" value={(i.kind ?? "—") as any} />
+                <Field label="Direction" value={(i.direction ?? i.option_side ?? "—").toUpperCase()} strong />
+                <Field label="Entry" value={(i.entry ?? "—") as any} />
+                <Field label="Target" value={(i.reach ?? "—") as any} />
               </div>
 
               {i.teaser ? (

@@ -1,6 +1,25 @@
 import Link from "next/link";
 import { headers, cookies } from "next/headers";
-import LockedSection from "@/components/LockedSection";
+import { getRequestBaseUrl } from "@/lib/server-url";
+
+type Idea = {
+  id: string;
+  slug: string;
+  idea_no: number | null;
+  created_at: string;
+  published_at: string | null;
+  status: string;
+  locked: boolean;
+  kind: string | null;
+  ticker: string | null;
+  direction: string | null;
+  option_side: string | null;
+  entry: string | null;
+  reach: string | null;
+  strike: string | null;
+  exp: string | null;
+  context: string | null;
+};
 
 async function getBaseUrl() {
   const h = await headers();
@@ -10,96 +29,133 @@ async function getBaseUrl() {
   return `${proto}://${host}`;
 }
 
-export default async function IdeaPage({ params }: { params: { slug: string } }) {
-  const base = await getBaseUrl();
+function canUnlock(me: any) {
+  const plan = me?.profile?.plan ?? me?.plan ?? "free";
+  const isAdmin = !!(me?.profile?.is_admin ?? me?.is_admin);
+  if (!me?.user) return false;
+  if (isAdmin) return true;
+  return plan === "ideas" || plan === "conviction" || plan === "macro";
+}
+
+export const runtime = "nodejs";
+
+export default async function IdeaDetailPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+
+  const base =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    (await getRequestBaseUrl().catch(() => "")) ??
+    (await getBaseUrl());
+
   const cookieHeader = cookies().toString();
 
-  const res = await fetch(`${base}/api/ideas/${params.slug}`, {
+  // viewer / entitlements
+  const meRes = await fetch(`${base}/api/me`, {
     cache: "no-store",
-    headers: {
-      cookie: cookieHeader,
-    },
-  });
+    headers: { cookie: cookieHeader },
+  }).catch(() => null);
+  const meJson = await meRes?.json().catch(() => null);
+  const unlock = canUnlock(meJson);
 
-  const json = await res.json().catch(() => null);
-  const idea = json?.data;
+  // idea
+  const res = await fetch(`${base}/api/ideas/${slug}`, {
+    cache: "no-store",
+    headers: { cookie: cookieHeader },
+  }).catch(() => null);
 
-  if (!res.ok || !idea) {
+  const json = await res?.json().catch(() => ({}));
+  const idea = (json?.data ?? null) as Idea | null;
+
+  if (!res?.ok || !idea) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-10">
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-white/90">
+      <main className="mx-auto max-w-3xl p-6 text-white">
+        <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200">
           This idea couldn't be loaded.
         </div>
-        <div className="mt-4">
-          <Link className="text-white/70 underline underline-offset-4 hover:text-white" href="/ideas">
-            Back to Ideas
-          </Link>
-        </div>
+        <Link href="/ideas" className="mt-4 inline-block text-sm underline underline-offset-4">
+          Back to Ideas
+        </Link>
       </main>
     );
   }
 
-  const userPlan = json?.viewer?.plan ?? "free";
-  const isAdmin = json?.viewer?.is_admin ?? false;
+  const isLocked = !!idea.locked && !unlock;
 
-  return (
-    <main className="mx-auto max-w-4xl px-4 py-10">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-xs tracking-widest text-white/50">{idea.ticker} • {idea.direction?.toUpperCase?.() ?? ""}</div>
-          <h1 className="mt-2 text-3xl font-semibold text-white">{idea.title}</h1>
-          {idea.teaser ? <p className="mt-3 text-white/70">{idea.teaser}</p> : null}
-        </div>
-
-        <Link
-          href="/subscribe"
-          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10"
-        >
-          View plans
-        </Link>
-      </div>
-
-      <div className="mt-8 grid gap-6">
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-          <div className="text-xs tracking-widest text-white/50">LEVEL I</div>
-          <h2 className="mt-2 text-lg font-semibold text-white">Idea Thesis</h2>
-          <div className="prose prose-invert mt-3 max-w-none text-white/80">
-            <p className="whitespace-pre-wrap">{idea.summary}</p>
-          </div>
-        </section>
-
-        <LockedSection
-          locked={!isAdmin && userPlan !== "conviction" && userPlan !== "macro"}
-          label="Conviction"
-        >
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <div className="text-xs tracking-widest text-white/50">LEVEL II</div>
-            <h2 className="mt-2 text-lg font-semibold text-white">Conviction</h2>
-            <div className="prose prose-invert mt-3 max-w-none text-white/80">
-              <p className="whitespace-pre-wrap">{idea.conviction}</p>
-            </div>
-          </section>
-        </LockedSection>
-
-        <LockedSection
-          locked={!isAdmin && userPlan !== "macro"}
-          label="Macro"
-        >
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <div className="text-xs tracking-widest text-white/50">LEVEL III</div>
-            <h2 className="mt-2 text-lg font-semibold text-white">Macro</h2>
-            <div className="prose prose-invert mt-3 max-w-none text-white/80">
-              <p className="whitespace-pre-wrap">{idea.macro_context}</p>
-            </div>
-          </section>
-        </LockedSection>
-
-        <div className="pt-2">
-          <Link className="text-white/60 underline underline-offset-4 hover:text-white" href="/ideas">
-            Back to Ideas
+  if (isLocked) {
+    return (
+      <main className="mx-auto max-w-3xl p-6 text-white">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
+          <div className="text-xl font-semibold">Locked</div>
+          <p className="mt-2 text-sm text-white/60">Upgrade to unlock full details.</p>
+          <Link
+            href="/plans"
+            className="mt-5 inline-flex rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black"
+          >
+            Upgrade
           </Link>
         </div>
+        <Link href="/ideas" className="mt-6 inline-block text-sm underline underline-offset-4">
+          Back to Ideas
+        </Link>
+      </main>
+    );
+  }
+
+  const badge = (idea.direction ?? idea.option_side ?? "—").toUpperCase();
+
+  return (
+    <main className="mx-auto max-w-3xl p-6 text-white">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-xs tracking-[0.35em] text-white/40">SHORT-IT</div>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+            {idea.ticker ?? "—"} <span className="text-white/40">•</span> {idea.kind ?? "Idea"}
+          </h1>
+          <div className="mt-2 text-xs text-white/40">
+            {new Date(idea.published_at ?? idea.created_at).toLocaleString()}
+          </div>
+        </div>
+
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold">
+          {badge}
+        </span>
       </div>
+
+      <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+          <Field label="Ticker" value={idea.ticker ?? "—"} />
+          <Field label="Type" value={idea.kind ?? "—"} />
+          <Field label="Entry" value={idea.entry ?? "—"} />
+          <Field label="Target" value={idea.reach ?? "—"} />
+
+          <Field label="Strike" value={idea.strike ?? "—"} />
+          <Field label="Exp" value={idea.exp ?? "—"} />
+        </div>
+
+        {idea.context ? (
+          <div className="mt-6">
+            <div className="text-xs tracking-widest text-white/40">Context</div>
+            <p className="mt-2 text-sm text-white/70 whitespace-pre-wrap">{idea.context}</p>
+          </div>
+        ) : null}
+      </div>
+
+      <Link href="/ideas" className="mt-6 inline-block text-sm underline underline-offset-4">
+        Back to Ideas
+      </Link>
     </main>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="text-xs tracking-widest text-white/40">{label}</div>
+      <div className="text-sm font-semibold">{value}</div>
+    </div>
   );
 }

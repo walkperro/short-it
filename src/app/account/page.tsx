@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { normalizePlan, planDisplay } from "@/lib/entitlements";
+import { isAdminEmail } from "@/lib/admin";
 
 export const runtime = "nodejs";
 
@@ -25,7 +27,16 @@ export default async function AccountPage() {
     );
   }
 
-  const plan = normalizePlan(user.user_metadata?.plan);
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("plan,is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const isAdmin = isAdminEmail(user.email) || !!profile?.is_admin;
+
+  // show real profile plan (what webhook writes)
+  const plan = normalizePlan(profile?.plan ?? "free");
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10 text-white">
@@ -36,7 +47,9 @@ export default async function AccountPage() {
         <div className="mt-1 text-lg font-semibold">{user.email}</div>
 
         <div className="mt-4 text-sm text-white/60">Plan</div>
-        <div className="mt-1 text-lg font-semibold">{planDisplay(plan)}</div>
+        <div className="mt-1 text-lg font-semibold">
+          {isAdmin ? "Admin" : planDisplay(plan)}
+        </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link

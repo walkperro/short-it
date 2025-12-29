@@ -16,12 +16,14 @@ type AdminIdea = {
 
   kind: IdeaKind | null;
   ticker: string | null;
+
+  // optional
   direction: Direction | null;
-  entry: number | null;
-  reach: number | null;
+  entry: string | null;   // TEXT now
+  reach: string | null;   // TEXT now (we label it Target)
   option_side: "call" | "put" | null;
-  strike: number | null;
-  exp: string | null;
+  strike: string | null;  // TEXT now
+  exp: string | null;     // YYYY-MM-DD string from date input
   context: string | null;
 };
 
@@ -61,16 +63,20 @@ export default function AdminClient() {
   const [published, setPublished] = useState<AdminIdea[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
   const [editing, setEditing] = useState<AdminIdea | null>(null);
 
   const [kind, setKind] = useState<IdeaKind>("Equity");
   const [ticker, setTicker] = useState("");
   const [direction, setDirection] = useState<Direction>("long");
+
+  // TEXT inputs (allow ranges)
   const [entry, setEntry] = useState<string>("");
-  const [reach, setReach] = useState<string>("");
-  const [optionSide, setOptionSide] = useState<"call" | "put">("call");
+  const [target, setTarget] = useState<string>(""); // maps to reach
   const [strike, setStrike] = useState<string>("");
   const [exp, setExp] = useState<string>(""); // YYYY-MM-DD
+
+  const [optionSide, setOptionSide] = useState<"call" | "put">("call");
   const [locked, setLocked] = useState(false);
   const [context, setContext] = useState("");
 
@@ -82,12 +88,10 @@ export default function AdminClient() {
     setTicker("");
     setDirection("long");
     setEntry("");
-    setReach("");
+    setTarget("");
     setStrike("");
     setExp("");
     setOptionSide("call");
-    setStrike("");
-    setExp("");
     setLocked(false);
     setContext("");
   }
@@ -108,45 +112,45 @@ export default function AdminClient() {
     load();
   }, []);
 
-  function toNumberOrNull(v: string) {
-    const t = v.trim();
-    if (!t) return null;
-    const n = Number(t);
-    return Number.isFinite(n) ? n : null;
-  }
-
-  function validate() {
-    const t = ticker.trim().toUpperCase();
-    if (!t) return "Ticker is required.";
-
-    if (isOption) {
-      if (!strike.trim()) return "Strike is required for options.";
-      if (!exp.trim()) return "EXP is required for options (YYYY-MM-DD).";
+  // If kind switches away from option, clear option-only fields (and UI disables them)
+  useEffect(() => {
+    if (!isOption) {
+      setStrike("");
+      setExp("");
+      setOptionSide("call");
     }
-    return null;
+  }, [isOption]);
+
+  function cleanStr(v: string) {
+    const t = v.trim();
+    return t ? t : null;
   }
 
   async function save(status: "draft" | "published") {
     setMsg(null);
 
-    const err = validate();
-    if (err) {
-      setMsg({ kind: "err", text: err });
-      return;
-    }
+    // Everything optional. If you want ticker required, uncomment:
+    // if (!ticker.trim()) { setMsg({ kind: "err", text: "Ticker is required." }); return; }
 
     const payload = {
       status,
       locked,
       kind,
-      ticker: ticker.trim().toUpperCase(),
+      ticker: cleanStr(ticker)?.toUpperCase() ?? null,
+
+      // direction ONLY for non-options, otherwise null
       direction: isOption ? null : direction,
-      entry: toNumberOrNull(entry),
-      reach: toNumberOrNull(reach),
+
+      // TEXT fields (allow ranges)
+      entry: cleanStr(entry),
+      reach: cleanStr(target), // DB column is reach, label is Target
+
+      // option-only fields
       option_side: isOption ? optionSide : null,
-      strike: isOption ? toNumberOrNull(strike) : null,
-      exp: isOption ? exp.trim() : null,
-      context: context.trim(),
+      strike: isOption ? cleanStr(strike) : null,
+      exp: isOption ? cleanStr(exp) : null,
+
+      context: cleanStr(context),
     };
 
     setBusy(true);
@@ -179,11 +183,11 @@ export default function AdminClient() {
     setKind((i.kind as IdeaKind) || "Equity");
     setTicker(i.ticker || "");
     setDirection((i.direction as Direction) || "long");
-    setEntry(i.entry == null ? "" : String(i.entry));
-    setReach(i.reach == null ? "" : String(i.reach));
-    setOptionSide((i.option_side as any) || "call");
-    setStrike(i.strike == null ? "" : String(i.strike));
+    setEntry(i.entry || "");
+    setTarget(i.reach || "");
+    setStrike(i.strike || "");
     setExp(i.exp || "");
+    setOptionSide((i.option_side as any) || "call");
     setLocked(!!i.locked);
     setContext(i.context || "");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -221,14 +225,6 @@ export default function AdminClient() {
     }
   }
 
-  // If kind switches away from option, clear strike/exp (and UI disables them)
-  useEffect(() => {
-    if (!isOption) {
-      setStrike("");
-      setExp("");
-    }
-  }, [isOption]);
-
   return (
     <main className="mx-auto max-w-6xl p-6 text-white">
       <div className="flex items-end justify-between">
@@ -257,11 +253,10 @@ export default function AdminClient() {
         </div>
       ) : null}
 
+      {/* CREATE / EDIT */}
       <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
         <div className="flex items-center justify-between">
-          <div className="text-lg font-semibold">
-            {editing ? `Edit Idea #${fmtIdeaNo(editing.idea_no)}` : "Create Idea"}
-          </div>
+          <div className="text-lg font-semibold">{editing ? `Edit Idea #${fmtIdeaNo(editing.idea_no)}` : "Create Idea"}</div>
           {editing ? (
             <button
               onClick={resetForm}
@@ -287,7 +282,7 @@ export default function AdminClient() {
             </select>
           </Field>
 
-          <Field label="Ticker">
+          <Field label="Ticker (optional)">
             <input
               value={ticker}
               onChange={(e) => setTicker(e.target.value)}
@@ -320,40 +315,33 @@ export default function AdminClient() {
             </Field>
           )}
 
-          <Field label="Entry">
+          <Field label="Entry (text)">
             <input
               value={entry}
               onChange={(e) => setEntry(e.target.value)}
-              inputMode="decimal"
-              placeholder="175"
+              placeholder="e.g. 200-201"
               className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-white/20"
             />
           </Field>
 
-          <Field label="Reach">
+          <Field label="Target (text)">
             <input
-              value={reach}
-              onChange={(e) => setReach(e.target.value)}
-              inputMode="decimal"
-              placeholder="200"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="e.g. 210-215"
               className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-white/20"
             />
           </Field>
 
-          
-          {/* OPTIONS ONLY: Strike + Exp */}
           <Field label="Strike (options only)">
             <input
               value={strike}
               onChange={(e) => setStrike(e.target.value)}
-              inputMode="decimal"
-              placeholder="500"
               disabled={!isOption}
+              placeholder="e.g. 500 or 500-510"
               className={[
                 "w-full rounded-2xl border px-4 py-3 outline-none",
-                !isOption
-                  ? "border-white/5 bg-black/20 text-white/30"
-                  : "border-white/10 bg-black/40 text-white focus:border-white/20",
+                !isOption ? "border-white/5 bg-black/20 text-white/30" : "border-white/10 bg-black/40 text-white focus:border-white/20",
               ].join(" ")}
             />
           </Field>
@@ -366,46 +354,13 @@ export default function AdminClient() {
               disabled={!isOption}
               className={[
                 "w-full rounded-2xl border px-4 py-3 outline-none",
-                !isOption
-                  ? "border-white/5 bg-black/20 text-white/30"
-                  : "border-white/10 bg-black/40 text-white focus:border-white/20",
-              ].join(" ")}
-            />
-          </Field>
-{/* OPTION-ONLY FIELDS */}
-          <Field label="STRIKE (options only)">
-            <input
-              value={strike}
-              onChange={(e) => setStrike(e.target.value)}
-              inputMode="decimal"
-              placeholder="e.g. 500"
-              disabled={!isOption}
-              className={[
-                "w-full rounded-2xl border px-4 py-3 outline-none",
-                !isOption
-                  ? "border-white/5 bg-black/20 text-white/30"
-                  : "border-white/10 bg-black/40 text-white focus:border-white/20",
-              ].join(" ")}
-            />
-          </Field>
-
-          <Field label="EXP (options only)">
-            <input
-              value={exp}
-              onChange={(e) => setExp(e.target.value)}
-              placeholder="YYYY-MM-DD"
-              disabled={!isOption}
-              className={[
-                "w-full rounded-2xl border px-4 py-3 outline-none",
-                !isOption
-                  ? "border-white/5 bg-black/20 text-white/30"
-                  : "border-white/10 bg-black/40 text-white focus:border-white/20",
+                !isOption ? "border-white/5 bg-black/20 text-white/30" : "border-white/10 bg-black/40 text-white focus:border-white/20",
               ].join(" ")}
             />
           </Field>
 
           <div className="md:col-span-2">
-            <label className="text-xs tracking-widest text-white/50">Context</label>
+            <label className="text-xs tracking-widest text-white/50">Context (optional)</label>
             <textarea
               value={context}
               onChange={(e) => setContext(e.target.value)}
@@ -418,9 +373,7 @@ export default function AdminClient() {
           <div className="md:col-span-2 flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
             <div>
               <div className="text-sm font-semibold">Locked</div>
-              <div className="text-xs text-white/60">
-                If ON, free users see a blurred/locked card. Paid users see it unlocked.
-              </div>
+              <div className="text-xs text-white/60">If ON, free users see a blurred/locked card. Paid users see it unlocked.</div>
             </div>
             <button
               onClick={() => setLocked((v) => !v)}
@@ -430,25 +383,20 @@ export default function AdminClient() {
               ].join(" ")}
               aria-label="Toggle locked"
             >
-              <span
-                className={[
-                  "block h-7 w-7 rounded-full bg-white transition",
-                  locked ? "translate-x-7" : "translate-x-1",
-                ].join(" ")}
-              />
+              <span className={["block h-7 w-7 rounded-full bg-white transition", locked ? "translate-x-7" : "translate-x-1"].join(" ")} />
             </button>
           </div>
         </div>
 
         <div className="mt-5 flex flex-col gap-3 md:flex-row">
-          <button type="button"
+          <button
             disabled={busy}
             onClick={() => save("draft")}
             className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white/90 hover:bg-white/10 disabled:opacity-60"
           >
             Save to drafts
           </button>
-          <button type="button"
+          <button
             disabled={busy}
             onClick={() => save("published")}
             className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-60"
@@ -458,18 +406,12 @@ export default function AdminClient() {
         </div>
       </div>
 
+      {/* DRAFTS */}
       <Section title={`Drafts (${drafts.length})`} subtitle="Edit these later or publish when ready.">
         {drafts.length ? (
           <div className="space-y-3">
             {drafts.map((i) => (
-              <Row
-                key={i.id}
-                idea={i}
-                onEdit={() => startEdit(i)}
-                onDelete={() => remove(i)}
-                onPrimary={() => setStatus(i, "published")}
-                primaryLabel="Publish"
-              />
+              <Row key={i.id} idea={i} onEdit={() => startEdit(i)} onDelete={() => remove(i)} onPrimary={() => setStatus(i, "published")} primaryLabel="Publish" />
             ))}
           </div>
         ) : (
@@ -477,18 +419,12 @@ export default function AdminClient() {
         )}
       </Section>
 
+      {/* PUBLISHED */}
       <Section title={`Published (${published.length})`} subtitle="Live ideas shown on the Ideas page.">
         {published.length ? (
           <div className="space-y-3">
             {published.map((i) => (
-              <Row
-                key={i.id}
-                idea={i}
-                onEdit={() => startEdit(i)}
-                onDelete={() => remove(i)}
-                onPrimary={() => setStatus(i, "draft")}
-                primaryLabel="Unpublish"
-              />
+              <Row key={i.id} idea={i} onEdit={() => startEdit(i)} onDelete={() => remove(i)} onPrimary={() => setStatus(i, "draft")} primaryLabel="Unpublish" />
             ))}
           </div>
         ) : (
@@ -508,15 +444,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
     <div className="mt-8">
       <div className="flex items-end justify-between">
@@ -531,11 +459,7 @@ function Section({
 }
 
 function Empty({ text }: { text: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
-      {text}
-    </div>
-  );
+  return <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">{text}</div>;
 }
 
 function Row({
@@ -565,14 +489,12 @@ function Row({
           <div className="mt-2 text-sm text-white/80">
             {isOption ? (
               <>
-                <span className="font-semibold">{(idea.option_side || "—").toUpperCase()}</span> • Strike:{" "}
-                {idea.strike ?? "—"} • Exp: {idea.exp ?? "—"} • Entry: {idea.entry ?? "—"} • Reach:{" "}
-                {idea.reach ?? "—"}
+                <span className="font-semibold">{(idea.option_side || "—").toUpperCase()}</span> • Strike: {idea.strike ?? "—"} • Exp: {idea.exp ?? "—"} • Entry:{" "}
+                {idea.entry ?? "—"} • Target: {idea.reach ?? "—"}
               </>
             ) : (
               <>
-                <span className="font-semibold">{(idea.direction || "—").toUpperCase()}</span> • Entry:{" "}
-                {idea.entry ?? "—"} • Reach: {idea.reach ?? "—"}
+                <span className="font-semibold">{(idea.direction || "—").toUpperCase()}</span> • Entry: {idea.entry ?? "—"} • Target: {idea.reach ?? "—"}
               </>
             )}{" "}
             • {idea.locked ? <span className="text-brand-red font-semibold">LOCKED</span> : "Unlocked"}
@@ -582,22 +504,13 @@ function Row({
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={onEdit}
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10"
-          >
+          <button onClick={onEdit} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10">
             Edit
           </button>
-          <button
-            onClick={onPrimary}
-            className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-black hover:opacity-90"
-          >
+          <button onClick={onPrimary} className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-black hover:opacity-90">
             {primaryLabel}
           </button>
-          <button
-            onClick={onDelete}
-            className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-200 hover:bg-red-500/15"
-          >
+          <button onClick={onDelete} className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-100 hover:bg-red-500/15">
             Delete
           </button>
         </div>

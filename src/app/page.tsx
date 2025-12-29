@@ -4,11 +4,22 @@ import { getRequestBaseUrl } from "@/lib/server-url";
 type Idea = {
   id: string;
   slug: string;
-  title: string;
-  ticker: string;
-  direction: "long" | "short";
-  teaser?: string | null;
+  idea_no?: number | null;
+  status?: string;
+  locked?: boolean;
   created_at: string;
+  published_at?: string | null;
+  kind?: string | null;
+  ticker: string;
+  direction?: "long" | "short" | null;
+  entry?: string | null;
+  reach?: string | null;
+  option_side?: "call" | "put" | null;
+  strike?: string | null;
+  exp?: string | null;
+  context?: string | null;
+  teaser?: string | null;
+  title?: string | null;
 };
 
 export const runtime = "nodejs";
@@ -85,16 +96,18 @@ export default async function HomePage() {
                       : "bg-red-500/15 text-red-300"
                   }`}
                 >
-                  {i.direction.toUpperCase()}
+                  {(i.direction ?? i.option_side ?? "—").toUpperCase()}
                 </span>
               </div>
 
               <div className="mt-3 text-lg font-semibold leading-snug">
-                {i.title}
+                IDEA #{String((i as any).idea_no ?? "—").toString().padStart(3, "0")} • {(i.kind ?? "—")} • {i.ticker}
               </div>
 
-              {i.teaser ? (
-                <p className="mt-2 text-sm text-white/70 line-clamp-2">{i.teaser}</p>
+              {(i.context ?? i.teaser) ? (
+                <p className="mt-2 text-sm text-white/70 line-clamp-2">
+                  {(i.context ?? i.teaser) as any}
+                </p>
               ) : null}
 
               <div className="mt-4 text-xs text-white/40">
