@@ -1,29 +1,35 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { normalizePlan } from "@/lib/entitlements";
 import { isAdminEmail } from "@/lib/admin";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(_req: NextRequest) {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) return NextResponse.json({ plan: "free" }, { status: 200 });
+  if (!user) return NextResponse.json({ plan: "free", is_admin: false, user: null });
 
-  // admin gets full access anyway
-  if (isAdminEmail(user.email)) {
-    return NextResponse.json({ plan: "macro" }, { status: 200 });
-  }
+  const email = user.email ?? null;
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("plan")
+    .select("plan,is_admin,stripe_customer_id,stripe_subscription_id")
     .eq("id", user.id)
     .maybeSingle();
 
-  const plan = normalizePlan(profile?.plan ?? "free");
-  return NextResponse.json({ plan }, { status: 200 });
+  const is_admin = isAdminEmail(email) || Boolean(profile?.is_admin);
+
+  // IMPORTANT:
+  // - If you're admin, treat plan as "admin" for display/unlock purposes.
+  // - Otherwise use profiles.plan (Stripe webhook writes here).
+  const plan = is_admin ? "admin" : (profile?.plan ?? "free");
+
+  return NextResponse.json({
+    user: { id: user.id, email },
+    plan,
+    is_admin,
+    profile: profile ?? null,
+  });
 }

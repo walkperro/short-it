@@ -6,6 +6,15 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 
 type Tier = "ideas" | "conviction" | "macro";
+type Plan = Tier | "free";
+
+function normalizeTier(x: any): Tier | null {
+  const v = String(x ?? "").toLowerCase().trim();
+  if (v === "ideas") return "ideas";
+  if (v === "conviction") return "conviction";
+  if (v === "macro") return "macro";
+  return null;
+}
 
 function tierFromPriceId(priceId: string): Tier | null {
   if (priceId === process.env.STRIPE_PRICE_IDEAS) return "ideas";
@@ -27,7 +36,7 @@ async function userIdFromCustomerId(customerId: string): Promise<string | undefi
 
 async function applyPlan(args: {
   userId: string;
-  plan: Tier | "free";
+  plan: Plan;
   customerId?: string | null;
   subscriptionId?: string | null;
 }) {
@@ -44,8 +53,7 @@ async function applyPlan(args: {
 }
 
 async function getPriceIdFromSubscription(sub: Stripe.Subscription): Promise<string | null> {
-  const priceId = sub.items.data?.[0]?.price?.id ?? null;
-  return priceId;
+  return sub.items.data?.[0]?.price?.id ?? null;
 }
 
 export async function POST(req: Request) {
@@ -71,61 +79,68 @@ export async function POST(req: Request) {
     );
   }
 
-  // ---- 1) checkout.session.completed (best place to map userId) ----
+  // 1) checkout.session.completed (best mapping: has metadata.userId + metadata.tier)
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
     const userId = (session.metadata as any)?.userId as string | undefined;
+    const tierMeta = normalizeTier((session.metadata as any)?.tier);
     if (!userId) return NextResponse.json({ received: true });
 
     const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
     const customerId = typeof session.customer === "string" ? session.customer : null;
 
-    let priceId: string | null = null;
+    // Prefer metadata tier (doesn't depend on env vars)
+    if (tierMeta) {
+      await applyPlan({ userId, plan: tierMeta, customerId, subscriptionId });
+      return NextResponse.json({ received: true });
+    }
+
+    // Fallback: infer from subscription price id
     if (subscriptionId) {
       const sub = await stripe.subscriptions.retrieve(subscriptionId, {
         expand: ["items.data.price"],
       });
-      priceId = sub.items.data?.[0]?.price?.id ?? null;
-    }
-
-    if (priceId) {
-      const plan = tierFromPriceId(priceId);
-      if (plan) {
-        await applyPlan({ userId, plan, customerId, subscriptionId });
+      const priceId = sub.items.data?.[0]?.price?.id ?? null;
+      if (priceId) {
+        const plan = tierFromPriceId(priceId);
+        if (plan) await applyPlan({ userId, plan, customerId, subscriptionId });
       }
     }
 
     return NextResponse.json({ received: true });
   }
 
-  // ---- 2) subscription created/updated (may not include metadata) ----
-  if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated") {
+  // 2) subscription created/updated
+  if (
+    event.type === "customer.subscription.created" ||
+    event.type === "customer.subscription.updated"
+  ) {
     const sub = event.data.object as Stripe.Subscription;
 
     const customerId = typeof sub.customer === "string" ? sub.customer : null;
     if (!customerId) return NextResponse.json({ received: true });
 
     let userId = (sub.metadata as any)?.userId as string | undefined;
-    if (!userId) {
-      userId = (await userIdFromCustomerId(customerId)) ?? undefined;
-}
+    if (!userId) userId = (await userIdFromCustomerId(customerId)) ?? undefined;
     if (!userId) return NextResponse.json({ received: true });
 
-    const subscriptionId = sub.id;
-    const priceId = await getPriceIdFromSubscription(sub);
+    const tierMeta = normalizeTier((sub.metadata as any)?.tier);
+    if (tierMeta) {
+      await applyPlan({ userId, plan: tierMeta, customerId, subscriptionId: sub.id });
+      return NextResponse.json({ received: true });
+    }
 
+    const priceId = await getPriceIdFromSubscription(sub);
     if (priceId) {
       const plan = tierFromPriceId(priceId);
-      if (plan) {
-        await applyPlan({ userId, plan, customerId, subscriptionId });
-      }
+      if (plan) await applyPlan({ userId, plan, customerId, subscriptionId: sub.id });
     }
 
     return NextResponse.json({ received: true });
   }
 
-  // ---- 3) subscription deleted (downgrade to free) ----
+  // 3) subscription deleted
   if (event.type === "customer.subscription.deleted") {
     const sub = event.data.object as Stripe.Subscription;
 
@@ -133,18 +148,10 @@ export async function POST(req: Request) {
     if (!customerId) return NextResponse.json({ received: true });
 
     let userId = (sub.metadata as any)?.userId as string | undefined;
-    if (!userId) {
-      userId = (await userIdFromCustomerId(customerId)) ?? undefined;
-}
+    if (!userId) userId = (await userIdFromCustomerId(customerId)) ?? undefined;
     if (!userId) return NextResponse.json({ received: true });
 
-    await applyPlan({
-      userId,
-      plan: "free",
-      customerId,
-      subscriptionId: null,
-    });
-
+    await applyPlan({ userId, plan: "free", customerId, subscriptionId: null });
     return NextResponse.json({ received: true });
   }
 
