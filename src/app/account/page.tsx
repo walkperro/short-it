@@ -51,12 +51,15 @@ export default async function AccountPage() {
             Manage billing / upgrade
           </Link>
 
-          <Link
-            href="/api/auth/signout"
-            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80"
-          >
-            Sign out
-          </Link>
+          {/* Sign out (POST) */}
+          <form action="/api/auth/signout" method="post">
+            <button
+              type="submit"
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+            >
+              Sign out
+            </button>
+          </form>
         </div>
       </div>
     </main>

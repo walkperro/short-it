@@ -40,23 +40,25 @@ const TIERS: Tier[] = [
 export default function SubscribePage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [plan, setPlan] = useState<Plan>("free");
-  const [loading, setLoading] = useState(true);
+  
+  async function syncPlan() {
+    try {
+      await fetch("/api/billing/sync", { method: "POST" });
+    } catch {}
+  }
+
+const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let alive = true;
     (async () => {
       try {
+        // ✅ restore purchases if Stripe says you are subscribed
+        await syncPlan();
         const res = await fetch("/api/me/plan", { cache: "no-store" });
         const json = await res.json().catch(() => ({}));
-        const p = normalizePlan(json?.plan);
-        if (alive) setPlan(p as Plan);
-      } finally {
-        if (alive) setLoading(false);
-      }
+        if (json?.plan) setPlan(json.plan);
+      } catch {}
     })();
-    return () => {
-      alive = false;
-    };
   }, []);
 
   async function checkout(tier: Plan) {
