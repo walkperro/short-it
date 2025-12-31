@@ -32,7 +32,7 @@ function LockedCard() {
         <div className="mt-6 flex items-center justify-between">
           <div className="text-xs text-white/60">Locked</div>
           <Link
-            href="/plans"
+            href="/subscribe"
             className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15 transition"
           >
             Upgrade to unlock 🔒
