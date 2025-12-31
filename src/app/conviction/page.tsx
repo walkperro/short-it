@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getRequestBaseUrl } from "@/lib/server-url";
-import { canAccess, type Plan } from "@/lib/entitlements";
+import { canAccess, normalizePlan, type Plan } from "@/lib/entitlements";
 
 type Idea = {
   id: string;
@@ -55,8 +55,8 @@ export default async function ConvictionPage() {
   }).catch(() => null);
 
   const meJson = await meRes?.json().catch(() => null);
-  const plan: Plan = (meJson?.viewer?.plan ?? "free") as Plan;
-  const isAdmin: boolean = !!meJson?.viewer?.is_admin;
+  const plan: Plan = normalizePlan(meJson?.profile?.plan ?? meJson?.plan ?? "free") as Plan;
+  const isAdmin: boolean = !!(meJson?.is_admin ?? meJson?.profile?.is_admin);
 
   let items: Idea[] = [];
   let errorMsg: string | null = null;

@@ -3,19 +3,15 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-async function doSignOut(_req: NextRequest) {
+// ✅ Some clients accidentally hit GET. Support it.
+export async function GET(_req: NextRequest) {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
-
-  // send them home
-  return NextResponse.redirect(new URL("/", _req.url), { status: 303 });
+  return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"));
 }
 
-// Support both (because something is triggering GET in production)
-export async function POST(req: NextRequest) {
-  return doSignOut(req);
-}
-
-export async function GET(req: NextRequest) {
-  return doSignOut(req);
+export async function POST(_req: NextRequest) {
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut();
+  return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"));
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { headers, cookies } from "next/headers";
 import { getRequestBaseUrl } from "@/lib/server-url";
+import { normalizePlan, type Plan } from "@/lib/entitlements";
 
 type Idea = {
   id: string;
@@ -30,16 +31,6 @@ async function getBaseUrl() {
   return `${proto}://${host}`;
 }
 
-function canUnlockIdeas(me: any) {
-  // supports BOTH shapes:
-  // { plan, is_admin } OR { profile: { plan, is_admin } }
-  const plan = me?.profile?.plan ?? me?.plan ?? "free";
-  const isAdmin = !!(me?.profile?.is_admin ?? me?.is_admin);
-  if (!me?.user) return false;
-  if (isAdmin) return true;
-  return plan === "ideas" || plan === "conviction" || plan === "macro";
-}
-
 function pad3(n: number) {
   return String(n).padStart(3, "0");
 }
@@ -59,11 +50,10 @@ export default async function IdeasPage() {
     cache: "no-store",
     headers: { cookie: cookieHeader },
   }).catch(() => null);
-  const meJson = await meRes?.json().catch(() => null);
 
-  const plan = meJson?.profile?.plan ?? meJson?.plan ?? "free";
+  const meJson = await meRes?.json().catch(() => null);
+  const plan: Plan = normalizePlan(meJson?.profile?.plan ?? meJson?.plan ?? "free");
   const isFree = plan === "free";
-  const unlock = canUnlockIdeas(meJson);
 
   // ideas list
   let items: Idea[] = [];
@@ -81,8 +71,8 @@ export default async function IdeasPage() {
     errorMsg = e?.message ?? "Failed to load ideas.";
   }
 
-  // FREE users: show first idea unlocked + rest locked
-  // PAID users: show all unlocked
+  // FREE users: show first 4 ideas (1st unlocked, rest locked UI)
+  // PAID users: show all
   const visible = isFree ? items.slice(0, 4) : items;
 
   return (
@@ -94,6 +84,7 @@ export default async function IdeasPage() {
             {isFree ? "Upgrade to see more trade ideas." : "Trade Ideas updated regularly."}
           </p>
         </div>
+
         {isFree ? (
           <Link
             href="/plans"
@@ -112,19 +103,18 @@ export default async function IdeasPage() {
 
       <div className="mt-8 grid gap-4">
         {visible.map((i, idx) => {
-          const locked = isFree && idx > 0 && !unlock;
-
+          // ✅ only lock extra cards for TRUE free users
+          const locked = isFree && idx > 0;
           if (locked) return <LockedCard key={i.id} num={idx + 1} />;
 
           return (
-            <div
+            <Link
               key={i.id}
-              className="rounded-3xl border border-white/10 bg-black/40 p-5"
+              href={`/ideas/${i.slug}`}
+              className="block rounded-3xl border border-white/10 bg-black/40 p-5 hover:border-white/20 hover:bg-black/60 transition"
             >
               <div className="flex items-center justify-between">
-                <div className="text-xs tracking-widest text-white/50">
-                  IDEA #{pad3(idx + 1)}
-                </div>
+                <div className="text-xs tracking-widest text-white/50">IDEA #{pad3(idx + 1)}</div>
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     i.direction === "long"
@@ -143,7 +133,11 @@ export default async function IdeasPage() {
               <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3">
                 <Field label="Ticker" value={i.ticker || "—"} strong />
                 <Field label="Type" value={(i.kind ?? "—") as any} />
-                <Field label="Direction" value={(i.direction ?? i.option_side ?? "—").toUpperCase()} strong />
+                <Field
+                  label="Direction"
+                  value={(i.direction ?? i.option_side ?? "—").toUpperCase()}
+                  strong
+                />
                 <Field label="Entry" value={(i.entry ?? "—") as any} />
                 <Field label="Target" value={(i.reach ?? "—") as any} />
               </div>
@@ -154,7 +148,7 @@ export default async function IdeasPage() {
                   <p className="mt-2 text-sm text-white/70">{i.teaser}</p>
                 </div>
               ) : null}
-            </div>
+            </Link>
           );
         })}
 
@@ -196,7 +190,7 @@ function LockedCard({ num }: { num: number }) {
       <div className="mt-3 h-4 w-64 rounded bg-white/10" />
       <div className="mt-2 h-4 w-56 rounded bg-white/10" />
 
-      <div className="pointer-events-auto absolute inset-0 grid place-items-center bg-black/45 backdrop-blur">
+      <div className="absolute inset-0 grid place-items-center bg-black/45 backdrop-blur">
         <div className="text-center">
           <div className="text-sm font-semibold text-white">Locked</div>
           <Link

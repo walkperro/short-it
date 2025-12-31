@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -17,6 +17,7 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { slug } = await params;
   const email = user.email ?? null;
 
   const { data: profile } = await supabaseAdmin
@@ -36,12 +37,13 @@ export async function GET(
   const { data: idea, error } = await supabaseAdmin
     .from("ideas")
     .select("*")
-    .eq("slug", params.slug)
+    .eq("slug", slug)
     .single();
 
   if (error || !idea) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ idea });
+  // ✅ keep response consistent with the rest of the app (idea detail page expects json.data)
+  return NextResponse.json({ data: idea });
 }

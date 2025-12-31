@@ -42,9 +42,9 @@ export const runtime = "nodejs";
 export default async function IdeaDetailPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: { slug: string };
 }) {
-  const { slug } = await params;
+  const { slug } = params;
 
   const base =
     process.env.NEXT_PUBLIC_SITE_URL ??
@@ -58,6 +58,7 @@ export default async function IdeaDetailPage({
     cache: "no-store",
     headers: { cookie: cookieHeader },
   }).catch(() => null);
+
   const meJson = await meRes?.json().catch(() => null);
   const unlock = canUnlock(meJson);
 
@@ -76,7 +77,10 @@ export default async function IdeaDetailPage({
         <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200">
           This idea couldn't be loaded.
         </div>
-        <Link href="/ideas" className="mt-4 inline-block text-sm underline underline-offset-4">
+        <Link
+          href="/ideas"
+          className="mt-4 inline-block text-sm underline underline-offset-4"
+        >
           Back to Ideas
         </Link>
       </main>
@@ -90,7 +94,9 @@ export default async function IdeaDetailPage({
       <main className="mx-auto max-w-3xl p-6 text-white">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
           <div className="text-xl font-semibold">Locked</div>
-          <p className="mt-2 text-sm text-white/60">Upgrade to unlock full details.</p>
+          <p className="mt-2 text-sm text-white/60">
+            Upgrade to unlock full details.
+          </p>
           <Link
             href="/plans"
             className="mt-5 inline-flex rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black"
@@ -98,7 +104,10 @@ export default async function IdeaDetailPage({
             Upgrade
           </Link>
         </div>
-        <Link href="/ideas" className="mt-6 inline-block text-sm underline underline-offset-4">
+        <Link
+          href="/ideas"
+          className="mt-6 inline-block text-sm underline underline-offset-4"
+        >
           Back to Ideas
         </Link>
       </main>
@@ -113,7 +122,8 @@ export default async function IdeaDetailPage({
         <div>
           <div className="text-xs tracking-[0.35em] text-white/40">SHORT-IT</div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            {idea.ticker ?? "—"} <span className="text-white/40">•</span> {idea.kind ?? "Idea"}
+            {idea.ticker ?? "—"} <span className="text-white/40">•</span>{" "}
+            {idea.kind ?? "Idea"}
           </h1>
           <div className="mt-2 text-xs text-white/40">
             {new Date(idea.published_at ?? idea.created_at).toLocaleString()}
@@ -131,7 +141,6 @@ export default async function IdeaDetailPage({
           <Field label="Type" value={idea.kind ?? "—"} />
           <Field label="Entry" value={idea.entry ?? "—"} />
           <Field label="Target" value={idea.reach ?? "—"} />
-
           <Field label="Strike" value={idea.strike ?? "—"} />
           <Field label="Exp" value={idea.exp ?? "—"} />
         </div>
@@ -139,12 +148,17 @@ export default async function IdeaDetailPage({
         {idea.context ? (
           <div className="mt-6">
             <div className="text-xs tracking-widest text-white/40">Context</div>
-            <p className="mt-2 text-sm text-white/70 whitespace-pre-wrap">{idea.context}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-white/70">
+              {idea.context}
+            </p>
           </div>
         ) : null}
       </div>
 
-      <Link href="/ideas" className="mt-6 inline-block text-sm underline underline-offset-4">
+      <Link
+        href="/ideas"
+        className="mt-6 inline-block text-sm underline underline-offset-4"
+      >
         Back to Ideas
       </Link>
     </main>

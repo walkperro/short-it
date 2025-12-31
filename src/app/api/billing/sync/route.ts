@@ -1,49 +1,58 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { stripe } from "@/lib/stripe/stripe";
+import Stripe from "stripe";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-const PRICE_TO_TIER: Record<string, "ideas" | "conviction" | "macro"> = {
-  [process.env.STRIPE_PRICE_IDEAS || ""]: "ideas",
-  [process.env.STRIPE_PRICE_CONVICTION || ""]: "conviction",
-  [process.env.STRIPE_PRICE_MACRO || ""]: "macro",
-};
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  // Let the installed stripe types decide; avoids TS apiVersion mismatches.
+});
 
-function tierRank(t: "ideas" | "conviction" | "macro") {
-  return t === "ideas" ? 1 : t === "conviction" ? 2 : 3;
+function tierFromPriceId(priceId?: string | null) {
+  if (!priceId) return null;
+  if (priceId === process.env.STRIPE_PRICE_IDEAS) return "ideas";
+  if (priceId === process.env.STRIPE_PRICE_CONVICTION) return "conviction";
+  if (priceId === process.env.STRIPE_PRICE_MACRO) return "macro";
+  return null;
+}
+
+// Highest tier wins if multiple subs exist
+function maxTier(a: string | null, b: string | null) {
+  const rank: Record<string, number> = { free: 0, ideas: 1, conviction: 2, macro: 3, admin: 99 };
+  const aa = a ?? "free";
+  const bb = b ?? "free";
+  return rank[bb] > rank[aa] ? bb : aa;
 }
 
 export async function POST(_req: NextRequest) {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
-
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const email = (user.email || "").toLowerCase().trim();
+  const email = user.email ?? null;
 
-  // Load profile stripe ids
+  // Read current profile
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("stripe_customer_id,stripe_subscription_id,plan")
+    .select("id,plan,stripe_customer_id,stripe_subscription_id,email")
     .eq("id", user.id)
     .maybeSingle();
 
+  // Find Stripe customer
   let customerId = profile?.stripe_customer_id ?? null;
 
-  // If missing customer id, try find by email
   if (!customerId && email) {
-    const existing = await stripe.customers.list({ email, limit: 1 });
-    customerId = existing.data[0]?.id ?? null;
+    const customers = await stripe.customers.list({ email, limit: 5 });
+    customerId = customers.data?.[0]?.id ?? null;
   }
 
-  // If still missing, nothing to sync (user may not have purchased)
   if (!customerId) {
-    return NextResponse.json({ ok: true, plan: profile?.plan ?? "free", reason: "no_customer" });
+    // Nothing to restore, keep as-is
+    return NextResponse.json({ ok: true, plan: profile?.plan ?? "free", customerId: null });
   }
 
-  // Pull subs
+  // Pull subscriptions (include inactive, we’ll filter)
   const subs = await stripe.subscriptions.list({
     customer: customerId,
     status: "all",
@@ -51,41 +60,32 @@ export async function POST(_req: NextRequest) {
     expand: ["data.items.data.price"],
   });
 
-  // Consider active-ish states
-  const live = subs.data.filter((s) =>
-    ["active", "trialing", "past_due"].includes(s.status)
-  );
-
-  // Determine best tier from price ids
-  let bestTier: "ideas" | "conviction" | "macro" | null = null;
+  let bestTier: string | null = null;
   let bestSubId: string | null = null;
 
-  for (const sub of live) {
-    for (const item of sub.items.data) {
-      const priceId = (item.price as any)?.id as string | undefined;
-      if (!priceId) continue;
-      const tier = PRICE_TO_TIER[priceId];
-      if (!tier) continue;
+  for (const sub of subs.data) {
+    // Treat these as “has access”
+    const okStatus = ["trialing", "active", "past_due", "unpaid"].includes(sub.status);
+    if (!okStatus) continue;
 
-      if (!bestTier || tierRank(tier) > tierRank(bestTier)) {
-        bestTier = tier;
-        bestSubId = sub.id;
-      }
-    }
+    const priceId = (sub.items?.data?.[0]?.price as any)?.id ?? null;
+    const tier = tierFromPriceId(priceId);
+    if (!tier) continue;
+
+    bestTier = maxTier(bestTier, tier);
+    bestSubId = sub.id;
   }
 
-  // Update profile
-  const nextPlan = bestTier ?? "free";
+  const finalPlan = bestTier ?? "free";
 
   await supabaseAdmin
     .from("profiles")
-    .upsert({
-      id: user.id,
+    .update({
+      plan: finalPlan,
       stripe_customer_id: customerId,
       stripe_subscription_id: bestSubId,
-      plan: nextPlan,
-      updated_at: new Date().toISOString(),
-    });
+    })
+    .eq("id", user.id);
 
-  return NextResponse.json({ ok: true, plan: nextPlan, stripe_customer_id: customerId, stripe_subscription_id: bestSubId });
+  return NextResponse.json({ ok: true, plan: finalPlan, customerId, subscriptionId: bestSubId });
 }
