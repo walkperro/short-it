@@ -25,7 +25,7 @@ type Idea = {
 export const runtime = "nodejs";
 
 export default async function HomePage() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (await getRequestBaseUrl());
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (await getRequestBaseUrl());
 
   let items: Idea[] = [];
   let errorMsg: string | null = null;

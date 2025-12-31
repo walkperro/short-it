@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
+import { isAdminEmail } from "@/lib/admin";
 import { normalizePlan, type Plan } from "@/lib/entitlements";
 
 type Idea = {
@@ -12,9 +14,9 @@ type Idea = {
   kind?: string | null;
   ticker: string;
   direction?: "long" | "short" | null;
-  option_side?: "call" | "put" | null;
   entry?: string | null;
   reach?: string | null;
+  option_side?: "call" | "put" | null;
   teaser?: string | null;
 };
 
@@ -25,28 +27,45 @@ function pad3(n: number) {
 }
 
 export default async function IdeasPage() {
-  // ✅ Relative fetch (Next forwards cookies automatically)
-  const meRes = await fetch("/api/me/plan", { cache: "no-store" }).catch(() => null);
-  const meJson = await meRes?.json().catch(() => null);
+  // viewer (server auth)
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const plan: Plan = normalizePlan(meJson?.plan ?? meJson?.profile?.plan ?? "free");
-  const isAdmin = !!(meJson?.is_admin ?? meJson?.profile?.is_admin);
-  const isFree = plan === "free" && !isAdmin;
+  let plan: Plan = "free";
+  let isAdmin = false;
 
-  // ideas list (public view)
+  if (user) {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("plan,is_admin")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    plan = normalizePlan(profile?.plan ?? "free");
+    isAdmin = isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
+  }
+
+  const isFree = !isAdmin && plan === "free";
+
+  // ideas list (direct query; no /api fetch)
   let items: Idea[] = [];
   let errorMsg: string | null = null;
 
-  try {
-    const res = await fetch("/api/ideas", { cache: "no-store" });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) errorMsg = json?.error ?? `Failed to load ideas (${res.status})`;
-    else items = (json?.data ?? []) as Idea[];
-  } catch (e: any) {
-    errorMsg = e?.message ?? "Failed to load ideas.";
-  }
+  const { data, error } = await supabaseAdmin
+    .from("ideas_public")
+    .select("id,slug,idea_no,status,locked,created_at,published_at,kind,ticker,direction,entry,reach,option_side,summary")
+    .order("published_at", { ascending: false, nullsFirst: false });
 
-  // FREE users: show first 4 (first unlocked, rest locked UI)
+  if (error) errorMsg = error.message;
+  items = (data ?? []).map((r: any) => ({
+    ...r,
+    teaser: r.summary ?? null,
+  })) as Idea[];
+
+  // FREE users: show first 4 ideas (1st unlocked UI, rest locked UI)
+  // PAID users: show all
   const visible = isFree ? items.slice(0, 4) : items;
 
   return (
@@ -55,7 +74,7 @@ export default async function IdeasPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Ideas</h1>
           <p className="mt-1 text-sm text-white/60">
-            {isFree ? "Upgrade to see more trade ideas." : "Trade ideas updated regularly."}
+            {isFree ? "Upgrade to see more trade ideas." : "Trade Ideas updated regularly."}
           </p>
         </div>
 
@@ -77,14 +96,16 @@ export default async function IdeasPage() {
 
       <div className="mt-8 grid gap-4">
         {visible.map((i, idx) => {
+          // lock extra cards only for TRUE free
           const locked = isFree && idx > 0;
+
           if (locked) return <LockedCard key={i.id} num={idx + 1} />;
 
           return (
             <Link
               key={i.id}
               href={`/ideas/${i.slug}`}
-              className="block rounded-3xl border border-white/10 bg-black/40 p-5 transition hover:border-white/20 hover:bg-black/60"
+              className="block rounded-3xl border border-white/10 bg-black/40 p-5 hover:border-white/20 hover:bg-black/60 transition"
             >
               <div className="flex items-center justify-between">
                 <div className="text-xs tracking-widest text-white/50">IDEA #{pad3(idx + 1)}</div>
@@ -99,7 +120,9 @@ export default async function IdeasPage() {
                 </span>
               </div>
 
-              <div className="mt-3 text-xs text-white/40">{new Date(i.created_at).toLocaleString()}</div>
+              <div className="mt-3 text-xs text-white/40">
+                {new Date(i.created_at).toLocaleString()}
+              </div>
 
               <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3">
                 <Field label="Ticker" value={i.ticker || "—"} strong />

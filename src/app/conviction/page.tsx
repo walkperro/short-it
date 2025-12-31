@@ -46,7 +46,7 @@ function LockedCard() {
 export const runtime = "nodejs";
 
 export default async function ConvictionPage() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (await getRequestBaseUrl());
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (await getRequestBaseUrl());
   const cookieHeader = cookies().toString();
 
   const meRes = await fetch(`${baseUrl}/api/me`, {
