@@ -26,9 +26,8 @@ type Idea = {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export default async function IdeaDetailPage({ params }: { params: { slug: string } }) {
-  const rawSlug = params.slug;
-
+export default async function IdeaDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug: rawSlug } = await params;
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
