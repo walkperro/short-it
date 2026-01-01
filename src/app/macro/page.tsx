@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LockIcon from "@/components/LockIcon";
 import { cookies } from "next/headers";
 import { getRequestBaseUrl } from "@/lib/server-url";
 import { canAccess, normalizePlan, type Plan } from "@/lib/entitlements";
@@ -11,6 +12,8 @@ type Idea = {
   direction: "long" | "short";
   created_at: string;
 };
+
+
 
 function LockedCard() {
   return (
@@ -29,12 +32,12 @@ function LockedCard() {
         </div>
 
         <div className="mt-6 flex items-center justify-between">
-          <div className="text-xs text-white/60">Locked</div>
+          <div className="flex items-center gap-2 text-xs text-white/60"><LockIcon className="h-4 w-4 text-white/60" /> Locked</div>
           <Link
             href="/subscribe"
             className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15 transition"
           >
-            Upgrade to unlock 🔒
+            Upgrade to unlock <span className="ml-2 inline-flex items-center"><LockIcon className="h-4 w-4 text-white/80" /></span>
           </Link>
         </div>
       </div>

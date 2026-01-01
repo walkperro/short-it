@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import LockIcon from "@/components/LockIcon";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import UserMenu from "@/components/UserMenu";
@@ -35,8 +36,8 @@ function Tab({
       <span className="tracking-tight">{label}</span>
 
       {locked ? (
-        <span className="ml-1 inline-flex items-center rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[11px] font-bold text-white/80">
-          🔒
+        <span className="ml-1 inline-flex items-center justify-center rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-white/80">
+          <LockIcon className="h-4 w-4 text-white/70" />
         </span>
       ) : null}
     </Link>
@@ -108,7 +109,7 @@ export default function NavBar() {
                 active === "conviction" ? "bg-white text-black" : "bg-white/5 text-white/80",
               ].join(" ")}
             >
-              {lockConviction ? "🔒 " : ""}Conv
+              {lockConviction ? (<span className="mr-1 inline-flex items-center justify-center rounded-full border border-white/10 bg-black/30 px-1.5 py-0.5 text-white/80"><LockIcon className="h-3.5 w-3.5 text-white/70" /></span>) : null}Conv
             </Link>
             <Link
               href="/macro"
@@ -117,7 +118,7 @@ export default function NavBar() {
                 active === "macro" ? "bg-white text-black" : "bg-white/5 text-white/80",
               ].join(" ")}
             >
-              {lockMacro ? "🔒 " : ""}Macro
+              {lockMacro ? (<span className="mr-1 inline-flex items-center justify-center rounded-full border border-white/10 bg-black/30 px-1.5 py-0.5 text-white/80"><LockIcon className="h-3.5 w-3.5 text-white/70" /></span>) : null}Macro
             </Link>
           </div>
 
