@@ -77,6 +77,15 @@ export default async function MacroPage() {
 
   return (
     <main className="mx-auto max-w-6xl p-6 text-white">
+<div className="relative">
+  <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-3xl bg-black/70 backdrop-blur-sm">
+    <div className="text-center">
+      <div className="text-xs tracking-[0.35em] text-white/50">SHORT-IT</div>
+      <div className="mt-2 text-3xl font-semibold tracking-tight text-white">Coming Soon</div>
+      <div className="mt-2 text-sm text-white/60">Macro is being built right now.</div>
+    </div>
+  </div>
+
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Macro</h1>
         <p className="mt-1 text-sm text-white/60">LEVEL III — only unlocked for Macro members.</p>
@@ -119,6 +128,7 @@ export default async function MacroPage() {
           </div>
         )}
       </div>
-    </main>
+    </div>
+</main>
   );
 }
