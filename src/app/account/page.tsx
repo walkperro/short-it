@@ -56,7 +56,7 @@ export default async function AccountPage() {
             href="/subscribe"
             className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10"
           >
-            Manage billing / upgrade
+            Manage billing / Upgrade
           </Link>
 
           {/* ✅ must POST to the API route */}

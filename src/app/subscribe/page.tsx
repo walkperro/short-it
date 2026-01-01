@@ -2,8 +2,53 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 type Tier = "free" | "ideas" | "conviction" | "macro" | "admin";
+
+const TIER_META: Record<Tier, { title: string; price: string; img: string; rank: number }> = {
+  free: { title: "Free", price: "$0", img: "/tiers/ideas.png", rank: 0 }, // only used for rank math
+  ideas: { title: "Ideas (LEVEL I)", price: "$29.99 / month", img: "/tiers/ideas.png", rank: 1 },
+  conviction: { title: "Conviction (LEVEL II)", price: "$79.99 / month", img: "/tiers/conviction.png", rank: 2 },
+  macro: { title: "Macro (LEVEL III)", price: "$199.99 / month", img: "/tiers/macro.png", rank: 3 },
+  // IMPORTANT: admin is NOT a paid plan; do not grant access by rank
+  admin: { title: "Admin", price: "$0", img: "/tiers/ideas.png", rank: 0 },
+};
+
+function rankOf(plan: Tier) {
+  return plan === "admin" ? 0 : TIER_META[plan].rank;
+}
+
+function LockIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      width={1200}
+           
+      aria-hidden="true"
+    >
+      <path
+        d="M7 10V8a5 5 0 0 1 10 0v2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6.5 10h11A2.5 2.5 0 0 1 20 12.5v6A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5v-6A2.5 2.5 0 0 1 6.5 10Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 14v3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 export default function SubscribePage() {
   const [plan, setPlan] = useState<Tier>("free");
@@ -22,13 +67,9 @@ export default function SubscribePage() {
     (async () => {
       try {
         setErr(null);
-        // ✅ restore purchases first
         await syncPlan();
-
-        // ✅ then read plan from DB-backed endpoint
         const res = await fetch("/api/me/plan", { cache: "no-store" });
         const json = await res.json().catch(() => ({}));
-
         if (!res.ok) throw new Error(json?.error ?? "Failed to load plan");
         if (json?.plan) setPlan(json.plan as Tier);
       } catch (e: any) {
@@ -45,7 +86,7 @@ export default function SubscribePage() {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier }), // ✅ stripe/checkout expects { tier }
+        body: JSON.stringify({ tier }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error ?? "Checkout failed");
@@ -55,8 +96,22 @@ export default function SubscribePage() {
     }
   }
 
+  const currentRank = rankOf(plan);
+
+  function isIncluded(tier: Exclude<Tier, "free" | "admin">) {
+    return TIER_META[tier].rank <= currentRank;
+  }
+
+  function isSelected(tier: Exclude<Tier, "free" | "admin">) {
+    return TIER_META[tier].rank === currentRank && currentRank > 0;
+  }
+
+  function isLockedTier(tier: Exclude<Tier, "free" | "admin">) {
+    return TIER_META[tier].rank > currentRank;
+  }
+
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10 text-white">
+    <main className="mx-auto max-w-6xl px-6 py-10 text-white">
       <h1 className="text-4xl font-semibold tracking-tight">Plans</h1>
       <p className="mt-2 text-sm text-white/60">
         Start with Ideas. Upgrade for Conviction + Macro context.
@@ -64,9 +119,7 @@ export default function SubscribePage() {
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
         <div className="text-xs tracking-widest text-white/50">CURRENT PLAN</div>
-        <div className="mt-2 text-2xl font-semibold">
-          {loading ? "Checking..." : plan}
-        </div>
+        <div className="mt-2 text-2xl font-semibold">{loading ? "Checking..." : plan}</div>
 
         {err ? (
           <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
@@ -102,22 +155,37 @@ export default function SubscribePage() {
         </div>
       </div>
 
-      <div className="mt-8 grid gap-4">
+      {/* Desktop goes horizontal */}
+      <div className="mt-8 grid gap-6 md:grid-cols-3">
         <TierCard
-          title="Ideas (LEVEL I)"
-          price="$29.99 / month"
+          title={TIER_META.ideas.title}
+          price={TIER_META.ideas.price}
+          img={TIER_META.ideas.img}
+          selected={isSelected("ideas")}
+          included={isIncluded("ideas")}
+          locked={isLockedTier("ideas")}
           disabled={loading}
           onClick={() => checkout("ideas")}
         />
+
         <TierCard
-          title="Conviction (LEVEL II)"
-          price="$59.99 / month"
+          title={TIER_META.conviction.title}
+          price={TIER_META.conviction.price}
+          img={TIER_META.conviction.img}
+          selected={isSelected("conviction")}
+          included={isIncluded("conviction")}
+          locked={isLockedTier("conviction")}
           disabled={loading}
           onClick={() => checkout("conviction")}
         />
+
         <TierCard
-          title="Macro (LEVEL III)"
-          price="$99.99 / month"
+          title={TIER_META.macro.title}
+          price={TIER_META.macro.price}
+          img={TIER_META.macro.img}
+          selected={isSelected("macro")}
+          included={isIncluded("macro")}
+          locked={isLockedTier("macro")}
           disabled={loading}
           onClick={() => checkout("macro")}
         />
@@ -129,24 +197,83 @@ export default function SubscribePage() {
 function TierCard({
   title,
   price,
+  img,
   onClick,
   disabled,
+  selected,
+  included,
+  locked,
 }: {
   title: string;
   price: string;
+  img: string;
   onClick: () => void;
   disabled?: boolean;
+  selected?: boolean;
+  included?: boolean;
+  locked?: boolean;
 }) {
+  const buttonText = `Unlock ${title.replace(/\s*\(.*?\)\s*/g, "").trim()}`;
+
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-      <div className="text-lg font-semibold">{title}</div>
-      <div className="mt-1 text-sm text-white/60">{price}</div>
+    <div
+      className={[
+        "rounded-3xl border bg-white/5 p-6 transition",
+        selected ? "border-white/30 ring-1 ring-white/20" : "border-white/10",
+        "hover:border-white/20",
+      ].join(" ")}
+    >
+      {/* Image area: full, not cropped */}
+      <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black/40"><Image
+            src={img}
+            alt={title}
+            width={1200}
+            height={675}
+            className="w-full h-auto object-contain"
+            priority={false}
+          />
+{/* locked overlay (only for tiers ABOVE current plan) */}
+        {locked ? (
+          <div className="absolute inset-0 grid place-items-center bg-black/55">
+            <div className="flex flex-col items-center gap-2">
+              <div className="grid h-12 w-12 place-items-center rounded-full border border-white/15 bg-black/40 text-white/70">
+                <LockIcon className="h-6 w-6 text-white/70" />
+              </div>
+              <div className="text-xs tracking-widest text-white/60">LOCKED</div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-5 flex items-start justify-between gap-3">
+        <div>
+          <div className="text-lg font-semibold">{title}</div>
+          <div className="mt-1 text-sm text-white/60">{price}</div>
+        </div>
+
+        {selected ? (
+          <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/70">
+            Selected
+          </span>
+        ) : null}
+      </div>
+
+      {/* Button rules:
+          - included (current plan or below): disabled + "Already included"
+          - locked (above): show Unlock button
+      */}
       <button
-        disabled={disabled}
+        disabled={disabled || included}
         onClick={onClick}
-        className="mt-5 w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-60"
+        className={[
+          "mt-5 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition",
+          included
+            ? "border border-white/10 bg-white/5 text-white/50"
+            : "bg-white text-black hover:opacity-95",
+          "disabled:opacity-60",
+        ].join(" ")}
       >
-        Choose plan
+        {included ? "Already included in your plan" : buttonText}
       </button>
     </div>
   );

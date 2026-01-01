@@ -141,8 +141,12 @@ export default async function IdeasPage() {
                 />
                 <Field label="Entry" value={(i.entry ?? "—") as any} />
                 <Field label="Target" value={(i.reach ?? "—") as any} />
-                <Field label="Strike" value={(i.strike ?? "—") as any} />
-                <Field label="Exp" value={(i.exp ?? "—") as any} />
+              {isOptionKind(i.kind) ? (
+                <>
+                  <Field label="Strike" value={(i.strike ?? "—") as any} />
+                  <Field label="Exp" value={(i.exp ?? "—") as any} />
+                </>
+              ) : null}
               </div>
 
               {i.teaser ? (

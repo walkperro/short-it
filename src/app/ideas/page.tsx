@@ -73,9 +73,8 @@ export default async function IdeasPage() {
 
   // FREE users: show first 4 ideas (1st unlocked UI, rest locked UI)
   // PAID users: show all
-  const visible = isFree ? items.slice(0, 4) : items;
-
-  return (
+  const visible = items;
+return (
     <main className="mx-auto max-w-6xl p-6 text-white">
       <div className="flex items-end justify-between">
         <div>
@@ -103,12 +102,10 @@ export default async function IdeasPage() {
 
       <div className="mt-8 grid gap-4">
         {visible.map((i, idx) => {
-          // lock extra cards only for TRUE free
-          const locked = isFree && idx > 0;
-
-          if (locked) return <LockedCard key={i.id} num={idx + 1} />;
-
-          return (
+          // lock based on admin "locked" toggle
+          const locked = isFree && Boolean(i.locked);
+          if (locked) return <LockedCard key={i.id} ideaNo={i.idea_no} />;
+return (
             <Link
               key={i.id}
               href={`/ideas/${i.slug}`}
@@ -186,11 +183,11 @@ function Field({
   );
 }
 
-function LockedCard({ num }: { num: number }) {
+function LockedCard({ ideaNo }: { ideaNo?: number | null }) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5">
       <div className="text-xs tracking-widest text-white/50">
-        IDEA #{String(num).padStart(3, "0")}
+        IDEA #{ideaNo ? pad3(Number(ideaNo)) : "—"}
       </div>
 
       <div className="mt-4 h-4 w-40 rounded bg-white/10" />
