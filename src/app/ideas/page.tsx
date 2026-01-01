@@ -17,6 +17,8 @@ type Idea = {
   entry?: string | null;
   reach?: string | null;
   option_side?: "call" | "put" | null;
+    strike?: string | null;
+  exp?: string | null;
   teaser?: string | null;
 };
 
@@ -24,6 +26,11 @@ export const runtime = "nodejs";
 
 function pad3(n: number) {
   return String(n).padStart(3, "0");
+}
+
+
+function isOptionKind(kind: string | null | undefined) {
+  return kind === "Buy Option" || kind === "Sell Option";
 }
 
 export default async function IdeasPage() {
@@ -55,13 +62,13 @@ export default async function IdeasPage() {
 
   const { data, error } = await supabaseAdmin
     .from("ideas_public")
-    .select("id,slug,idea_no,status,locked,created_at,published_at,kind,ticker,direction,entry,reach,option_side,summary")
+    .select("id,slug,idea_no,status,locked,created_at,published_at,kind,ticker,direction,entry,reach,option_side,strike,exp,summary,context")
     .order("published_at", { ascending: false, nullsFirst: false });
 
   if (error) errorMsg = error.message;
   items = (data ?? []).map((r: any) => ({
     ...r,
-    teaser: r.summary ?? null,
+    teaser: r.summary ?? r.context ?? null,
   })) as Idea[];
 
   // FREE users: show first 4 ideas (1st unlocked UI, rest locked UI)
@@ -108,7 +115,7 @@ export default async function IdeasPage() {
               className="block rounded-3xl border border-white/10 bg-black/40 p-5 hover:border-white/20 hover:bg-black/60 transition"
             >
               <div className="flex items-center justify-between">
-                <div className="text-xs tracking-widest text-white/50">IDEA #{pad3(idx + 1)}</div>
+                <div className="text-xs tracking-widest text-white/50">IDEA #{i.idea_no ? pad3(Number(i.idea_no)) : "—"}</div>
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     i.direction === "long"
@@ -121,7 +128,7 @@ export default async function IdeasPage() {
               </div>
 
               <div className="mt-3 text-xs text-white/40">
-                {new Date(i.created_at).toLocaleString()}
+                {new Date((i.published_at ?? i.created_at) as any).toLocaleString()}
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3">
@@ -134,6 +141,8 @@ export default async function IdeasPage() {
                 />
                 <Field label="Entry" value={(i.entry ?? "—") as any} />
                 <Field label="Target" value={(i.reach ?? "—") as any} />
+                <Field label="Strike" value={(i.strike ?? "—") as any} />
+                <Field label="Exp" value={(i.exp ?? "—") as any} />
               </div>
 
               {i.teaser ? (
