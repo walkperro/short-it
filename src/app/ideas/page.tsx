@@ -207,16 +207,7 @@ export default async function IdeasPage(props: {
         </div>
       </form>
 
-      <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-3 text-xs text-white/70">
-  <div className="text-white/40">debug (server):</div>
-  <div className="mt-1 font-mono break-words">kindParam: {JSON.stringify(kindParam)}</div>
-  <div className="mt-1 font-mono break-words">fromParam: {JSON.stringify(fromParam)}</div>
-  <div className="mt-1 font-mono break-words">toParam: {JSON.stringify(toParam)}</div>
-  <div className="mt-1 font-mono break-words">isoFrom: {JSON.stringify(fromParam ? toDayStartISO(fromParam) : "")}</div>
-  <div className="mt-1 font-mono break-words">isoTo: {JSON.stringify(toParam ? nextDayStartISO(toParam) : "")}</div>
-  <div className="mt-1 font-mono break-words">items.length: {items.length}</div>
-  <div className="mt-1 font-mono break-words">kindSample: {JSON.stringify(kindSample)}</div>
-</div>
+
 
 {errorMsg ? (
         <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
