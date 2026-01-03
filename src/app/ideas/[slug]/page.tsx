@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getRequestBaseUrl } from "@/lib/server-url";
 import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { normalizePlan, type Plan } from "@/lib/entitlements";
@@ -41,6 +42,8 @@ export default async function IdeaDetailPage({ params }: { params: Promise<{ slu
             Go to Account
           </Link>
         </div>
+      
+
         <Link href="/ideas" className="mt-6 inline-block text-sm underline underline-offset-4">Back to Ideas</Link>
       </main>
     );
@@ -107,6 +110,14 @@ export default async function IdeaDetailPage({ params }: { params: Promise<{ slu
       </main>
     );
   }
+  // CTA: only show if a published conviction exists for this idea
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (await getRequestBaseUrl());
+  let hasConviction = false;
+  try {
+    const res = await fetch(`${baseUrl}/api/convictions/${idea.slug}`, { cache: "no-store" });
+    hasConviction = res.ok;
+  } catch {}
+
 
   const badge = (idea.direction ?? idea.option_side ?? "—").toUpperCase();
 
@@ -142,6 +153,18 @@ export default async function IdeaDetailPage({ params }: { params: Promise<{ slu
           </div>
         ) : null}
       </div>
+      <Link
+        href={hasConviction ? `/conviction/${idea.slug}` : "/conviction"}
+        className="mt-5 block rounded-3xl border border-white/10 bg-white/5 p-5 hover:border-white/20 hover:bg-white/10 transition"
+      >
+        <div className="text-sm font-semibold">
+          Read the full conviction <span className="text-white/60">→</span>
+        </div>
+        <div className="mt-2 text-sm text-white/60">
+          Thesis • Time Expectations • Catalysts/Invalidation Points
+        </div>
+      </Link>
+
 
       <Link href="/ideas" className="mt-6 inline-block text-sm underline underline-offset-4">Back to Ideas</Link>
     </main>
