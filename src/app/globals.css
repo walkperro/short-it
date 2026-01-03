@@ -67,3 +67,12 @@ body {
 .shortit-enter-pop {
   animation: shortit-enter-pop 220ms ease-out;
 }
+
+/* Subtle LEVEL label fade-in */
+@keyframes levelFadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.level-fade {
+  animation: levelFadeIn 700ms ease-out both;
+}

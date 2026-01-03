@@ -50,6 +50,20 @@ function fmtIdeaNo(n?: number | null) {
   return String(n).padStart(3, "0");
 }
 
+
+
+function dirBadge(direction?: string | null, optionSide?: string | null) {
+  const raw = (direction ?? optionSide ?? "—") as any;
+  const up = String(raw).toUpperCase();
+  const cls =
+    raw === "long" || raw === "call"
+      ? "bg-emerald-500/15 text-emerald-400"
+      : raw === "short" || raw === "put"
+      ? "bg-red-500/15 text-red-400"
+      : "bg-white/10 text-white/80";
+  return { up, cls };
+}
+
 function LockedCard() {
   return (
     <div className="relative min-w-[320px] max-w-[360px] shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-black/40 p-5">
@@ -121,7 +135,7 @@ export default async function ConvictionPage(props: {
   let q = supabaseAdmin
     .from("convictions")
     .select(
-      "id,idea_id,status,body,created_at,published_at,ideas:idea_id!inner(slug,idea_no,ticker,kind,created_at,published_at,status)",
+      "id,idea_id,status,body,created_at,published_at,ideas:idea_id!inner(slug,idea_no,ticker,kind,direction,option_side,created_at,published_at,status)",
     )
     .eq("status","published").eq("ideas.status","published").order("published_at", { ascending: false, nullsFirst: false });
 
@@ -147,8 +161,9 @@ export default async function ConvictionPage(props: {
   return (
     <main className="mx-auto max-w-6xl p-6 text-white">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Conviction</h1>
-        <p className="mt-1 text-sm text-white/60">LEVEL II — unlocked for Conviction+ members.</p>
+        <div className="level-fade text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Conviction</h1>
+        <p className="mt-1 text-sm text-white/60">Unlocked for Conviction+ members.</p>
       </div>
 
       {/* Filters */}
@@ -235,9 +250,12 @@ export default async function ConvictionPage(props: {
                 <div className="text-xs tracking-widest text-white/50">
                   IDEA #{fmtIdeaNo(idea?.idea_no)} • {idea?.ticker || "—"}
                 </div>
-                <span className="rounded-full px-3 py-1 text-xs font-semibold bg-white/10 text-white/80">
-                  LEVEL II
-                </span>
+                {(() => {
+  const b = dirBadge((idea as any)?.direction ?? null, (idea as any)?.option_side ?? null);
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${b.cls}`}>{b.up}</span>
+  );
+})()}
               </div>
 
               <div className="mt-3 text-lg font-semibold leading-snug">

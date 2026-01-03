@@ -129,7 +129,8 @@ export default async function IdeasPage(props: {
     <main className="mx-auto max-w-6xl p-6 text-white">
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Ideas</h1>
+          <div className="level-fade text-xs tracking-[0.35em] text-white/40">LEVEL I</div>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Ideas</h1>
           <p className="mt-1 text-sm text-white/60">
             {isFree
               ? "Upgrade to see more trade ideas."

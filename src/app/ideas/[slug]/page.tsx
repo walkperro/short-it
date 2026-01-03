@@ -164,7 +164,7 @@ export default async function IdeaDetailPage({
     <main className="mx-auto max-w-3xl p-6 text-white">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs tracking-[0.35em] text-white/40">SHORT-IT</div>
+          <div className="level-fade text-xs tracking-[0.35em] text-white/40">LEVEL I</div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             {idea.ticker ?? "—"} <span className="text-white/40">•</span>{" "}
             {idea.kind ?? "Idea"}
@@ -181,15 +181,20 @@ export default async function IdeaDetailPage({
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
         <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-          <Field label="Ticker" value={idea.ticker ?? "—"} />
-          <Field label="Type" value={idea.kind ?? "—"} />
-          <Field label="Entry" value={idea.entry ?? "—"} />
-          <Field label="Target" value={idea.reach ?? "—"} />
-          <Field label="Strike" value={idea.strike ?? "—"} />
-          <Field label="Exp" value={idea.exp ?? "—"} />
-        </div>
+  <Field label="Ticker" value={idea.ticker ?? "—"} />
+  <Field label="Type" value={idea.kind ?? "—"} />
+  <Field label="Direction" value={badge} />
+  <Field label="Entry" value={idea.entry ?? "—"} />
+  <Field label="Target" value={idea.reach ?? "—"} />
+  {isOptionKind(idea.kind) ? (
+    <>
+      <Field label="Strike" value={idea.strike ?? "—"} />
+      <Field label="Exp" value={idea.exp ?? "—"} />
+    </>
+  ) : null}
+</div>
 
-        {idea.context ? (
+{idea.context ? (
           <div className="mt-6">
             <div className="text-xs tracking-widest text-white/40">Context</div>
             <p className="mt-2 whitespace-pre-wrap text-sm text-white/70">
@@ -228,6 +233,10 @@ export default async function IdeaDetailPage({
       </Link>
     </main>
   );
+}
+
+function isOptionKind(kind: string | null | undefined) {
+  return kind === "Buy Option" || kind === "Sell Option";
 }
 
 function Field({

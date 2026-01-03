@@ -130,7 +130,7 @@ export default async function ConvictionDetailPage({
     <main className="mx-auto max-w-3xl p-6 text-white">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
+          <div className="level-fade text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             {idea.ticker ?? "—"} <span className="text-white/40">•</span>{" "}
             {idea.kind ?? "Conviction"}
