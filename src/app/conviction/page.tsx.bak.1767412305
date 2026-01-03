@@ -1,29 +1,19 @@
 import Link from "next/link";
 import LockIcon from "@/components/LockIcon";
-import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
-import { isAdminEmail } from "@/lib/admin";
+import { cookies } from "next/headers";
+import { getRequestBaseUrl } from "@/lib/server-url";
 import { canAccess, normalizePlan, type Plan } from "@/lib/entitlements";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 type ConvictionItem = {
   id: string;
   idea_id: string;
-  status: string;
+  idea_slug: string | null;
+  idea_no?: number | null;
+  ticker: string | null;
+  kind: string | null;
   body: string | null;
   created_at: string;
-  published_at: string | null;
-  ideas?: {
-    slug: string | null;
-    idea_no: number | null;
-    ticker: string | null;
-    kind: string | null;
-    created_at: string;
-    published_at: string | null;
-    status: string;
-  } | null;
+  published_at?: string | null;
 };
 
 function fmtIdeaNo(n?: number | null) {
@@ -40,7 +30,6 @@ function LockedCard() {
           <div className="h-4 w-20 rounded bg-white/10" />
           <div className="h-6 w-20 rounded-full bg-white/10" />
         </div>
-
         <div className="mt-4 h-5 w-3/4 rounded bg-white/10" />
         <div className="mt-3 space-y-2">
           <div className="h-3 w-full rounded bg-white/10" />
@@ -67,43 +56,34 @@ function LockedCard() {
   );
 }
 
+export const runtime = "nodejs";
+
 export default async function ConvictionPage() {
-  // viewer (server auth) — no internal /api/me fetch
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (await getRequestBaseUrl());
+  const cookieHeader = cookies().toString();
 
-  let plan: Plan = "free";
-  let isAdmin = false;
+  const meRes = await fetch(`${baseUrl}/api/me`, {
+    cache: "no-store",
+    headers: { cookie: cookieHeader },
+  }).catch(() => null);
 
-  if (user) {
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("plan,is_admin")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    plan = normalizePlan(profile?.plan ?? "free") as Plan;
-    isAdmin = isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
-  }
+  const meJson = await meRes?.json().catch(() => null);
+  const plan: Plan = normalizePlan(meJson?.profile?.plan ?? meJson?.plan ?? "free") as Plan;
+  const isAdmin: boolean = !!(meJson?.is_admin ?? meJson?.profile?.is_admin);
 
   const allowed = isAdmin || canAccess("conviction", plan);
 
-  // Pull published convictions (public list), join ideas
   let items: ConvictionItem[] = [];
   let errorMsg: string | null = null;
 
-  const { data, error } = await supabaseAdmin
-    .from("convictions")
-    .select(
-      "id,idea_id,status,body,created_at,published_at,ideas:idea_id(slug,idea_no,ticker,kind,created_at,published_at,status)",
-    )
-    .eq("status", "published")
-    .order("published_at", { ascending: false, nullsFirst: false });
-
-  if (error) errorMsg = error.message;
-  items = (data ?? []) as any;
+  try {
+    const res = await fetch(`${baseUrl}/api/convictions`, { cache: "no-store" });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) errorMsg = json?.error ?? `Failed to load convictions (${res.status})`;
+    else items = (json?.data ?? []) as ConvictionItem[];
+  } catch (e: any) {
+    errorMsg = e?.message ?? "Failed to load convictions.";
+  }
 
   const four = items.slice(0, 4);
 
@@ -111,25 +91,20 @@ export default async function ConvictionPage() {
     <main className="mx-auto max-w-6xl p-6 text-white">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Conviction</h1>
-        <p className="mt-1 text-sm text-white/60">
-          LEVEL II — unlocked for Conviction+ members.
-        </p>
+        <p className="mt-1 text-sm text-white/60">LEVEL II — unlocked for Conviction+ members.</p>
       </div>
 
-      {errorMsg ? (
+      {errorMsg && (
         <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {errorMsg}
         </div>
-      ) : null}
+      )}
 
       <div className="mt-8 flex gap-4 overflow-x-auto pb-4">
         {four.map((c) => {
           if (!allowed) return <LockedCard key={`locked-${c.id}`} />;
 
-          const idea = c.ideas ?? null;
-          const slug = idea?.slug ?? "";
-          const when = c.published_at || c.created_at;
-
+          const slug = c.idea_slug || "";
           return (
             <Link
               key={c.id}
@@ -138,7 +113,7 @@ export default async function ConvictionPage() {
             >
               <div className="flex items-center justify-between">
                 <div className="text-xs tracking-widest text-white/50">
-                  IDEA #{fmtIdeaNo(idea?.idea_no)} • {idea?.ticker || "—"}
+                  IDEA #{fmtIdeaNo(c.idea_no)} • {c.ticker || "—"}
                 </div>
                 <span className="rounded-full px-3 py-1 text-xs font-semibold bg-white/10 text-white/80">
                   LEVEL II
@@ -146,8 +121,7 @@ export default async function ConvictionPage() {
               </div>
 
               <div className="mt-3 text-lg font-semibold leading-snug">
-                {idea?.ticker || "—"} <span className="text-white/40">•</span>{" "}
-                {idea?.kind || "Conviction"}
+                {c.ticker || "—"} <span className="text-white/40">•</span> {c.kind || "Conviction"}
               </div>
 
               <p className="mt-3 text-sm text-white/70 line-clamp-4">
@@ -155,17 +129,17 @@ export default async function ConvictionPage() {
               </p>
 
               <div className="mt-4 text-xs text-white/40">
-                {new Date(when).toLocaleString()}
+                {new Date(c.published_at || c.created_at).toLocaleString()}
               </div>
             </Link>
           );
         })}
 
-        {!errorMsg && four.length === 0 ? (
+        {!errorMsg && four.length === 0 && (
           <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
             No published convictions yet.
           </div>
-        ) : null}
+        )}
       </div>
     </main>
   );
