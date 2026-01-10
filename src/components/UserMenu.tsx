@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -77,9 +77,11 @@ export default function UserMenu() {
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/5 text-sm font-semibold text-white/90 hover:bg-white/10"
         aria-label="Open menu"
+      >
         <span>{initials(me?.user?.email ?? null)}</span>
 
         {/* Level badge */}
@@ -96,6 +98,7 @@ export default function UserMenu() {
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.16 }}
             className="absolute right-0 mt-3 w-56 overflow-hidden rounded-2xl border border-white/10 bg-black/90 backdrop-blur-xl"
+          >
             <div className="px-3 py-3">
               <div className="text-xs tracking-widest text-white/50">
                 {me?.is_admin ? "ADMIN" : levelLong}
@@ -108,8 +111,7 @@ export default function UserMenu() {
             <div className="h-px bg-white/10" />
 
             <div className="p-2">
-              
-<MenuLink href="/subscribe" onNavigate={close}>
+              <MenuLink href="/subscribe" onNavigate={close}>
                 Plans
               </MenuLink>
 
@@ -123,7 +125,6 @@ export default function UserMenu() {
                     Account
                   </MenuLink>
 
-                  {/* HIDE ADMIN COMPLETELY UNLESS ADMIN */}
                   {me?.is_admin ? (
                     <MenuLink href="/admin" onNavigate={close}>
                       Admin
@@ -131,12 +132,14 @@ export default function UserMenu() {
                   ) : null}
 
                   <button
+                    type="button"
                     onClick={async () => {
                       await fetch("/api/logout", { method: "POST" });
                       close();
                       window.location.href = "/login";
                     }}
                     className="w-full rounded-xl px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10"
+                  >
                     Sign out
                   </button>
                 </>
