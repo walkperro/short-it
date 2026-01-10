@@ -50,6 +50,7 @@ function MenuLink({
       href={href}
       onClick={onNavigate}
       className="block rounded-xl px-3 py-2 text-sm text-white/85 hover:bg-white/10"
+    >
       {children}
     </Link>
   );
