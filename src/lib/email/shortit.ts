@@ -10,6 +10,65 @@ type SendShortItEmailArgs = {
   billingUrl?: string;
 };
 
+function accessHtml(plan: string, level: string, dashboardUrl: string, billingUrl?: string) {
+  return `
+  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#ffffff;color:#111;padding:24px">
+    <div style="max-width:560px;margin:0 auto">
+      <h2 style="margin:0 0 12px;font-size:18px;font-weight:600">
+        Short-It account update
+      </h2>
+
+      <p style="font-size:14px;line-height:1.6;margin:0 0 12px">
+        Your Short-It account access is now active.
+      </p>
+
+      <p style="font-size:14px;line-height:1.6;margin:0 0 12px">
+        <strong>Active plan:</strong> ${plan} (${level})
+      </p>
+
+      <a href="${dashboardUrl}"
+         style="display:inline-block;margin-top:16px;padding:10px 14px;
+                border-radius:6px;background:#111;color:#fff;
+                text-decoration:none;font-size:14px">
+        Open dashboard
+      </a>
+
+      <p style="font-size:12px;color:#555;margin-top:20px">
+        Manage billing: <a href="${billingUrl ?? dashboardUrl}" style="color:#111">Manage subscription</a>
+      </p>
+
+      <hr style="margin:28px 0;border:none;border-top:1px solid #e5e7eb" />
+
+      <p style="font-size:12px;color:#555;margin:0">
+        If you did not request this change, you can ignore this email.
+      </p>
+
+      <p style="font-size:12px;color:#555;margin-top:6px">
+        Short-It Trade Intel
+      </p>
+    </div>
+  </div>
+  `;
+}
+
+function accessText(plan: string, level: string, dashboardUrl: string, billingUrl?: string) {
+  return `
+Your Short-It account access is now active.
+
+Active plan: ${plan} (${level})
+
+Dashboard:
+${dashboardUrl}
+
+Manage billing:
+${billingUrl ?? dashboardUrl}
+
+If you did not request this change, you can ignore this email.
+
+— Short-It Trade Intel
+`;
+}
+
 export async function sendShortItAccessEmail({
   email,
   plan,
@@ -18,45 +77,13 @@ export async function sendShortItAccessEmail({
   billingUrl,
 }: SendShortItEmailArgs) {
   return resend.emails.send({
-    from: "Short-It Trade Intel <access@short-it.trade>",
+    from: "Short-It <no-reply@short-it.trade>",
     to: email,
-    subject: `Short-It Access Activated — ${plan} (${level})`,
-    html: `
-<div style="background:#0a0a0a;padding:40px 0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#ffffff;">
-  <div style="max-width:560px;margin:0 auto;background:#111111;border-radius:16px;padding:32px;border:1px solid rgba(255,255,255,0.08);">
-    <div style="text-align:center;margin-bottom:28px;">
-      <div style="font-size:14px;letter-spacing:2px;color:#888;">SHORT-IT</div>
-      <div style="font-size:11px;letter-spacing:3px;color:#555;">TRADE INTEL</div>
-    </div>
-
-    <h1 style="font-size:22px;font-weight:600;text-align:center;">You’re in.</h1>
-
-    <p style="font-size:14px;color:#ccc;text-align:center;">
-      Your <strong>${plan}</strong> access is now live.
-    </p>
-
-    <div style="background:#0d0d0d;border-radius:12px;padding:20px;border:1px solid rgba(255,255,255,0.06);margin:24px 0;">
-      <div style="font-size:12px;color:#888;">SUBSCRIPTION</div>
-      <div style="font-size:18px;font-weight:600;">
-        ${plan} <span style="color:#888;font-size:13px;">(${level})</span>
-      </div>
-    </div>
-
-    <a href="${dashboardUrl}" style="display:block;text-align:center;background:#ffffff;color:#000;padding:14px;border-radius:12px;font-weight:600;text-decoration:none;">
-      Open Short-It Dashboard
-    </a>
-
-    <p style="font-size:12px;color:#888;margin-top:24px;">
-      Manage billing anytime:
-      <br />
-      <a href="${billingUrl ?? dashboardUrl}" style="color:#fff;">Manage Subscription</a>
-    </p>
-
-    <p style="font-size:11px;color:#666;margin-top:28px;">
-      Stripe receipts are sent separately.
-    </p>
-  </div>
-</div>
-    `,
+    subject: "Your Short-It account access is active",
+    html: accessHtml(plan, level, dashboardUrl, billingUrl),
+    text: accessText(plan, level, dashboardUrl, billingUrl),
+    headers: {
+      "List-Unsubscribe": "<mailto:unsubscribe@short-it.trade>",
+    },
   });
 }
