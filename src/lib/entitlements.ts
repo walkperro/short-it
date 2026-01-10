@@ -23,11 +23,7 @@ export function planDisplay(plan: Plan) {
   return "Free";
 }
 
-/**
- * canAccess supports BOTH call orders:
- *  - canAccess(plan, section)
- *  - canAccess(section, plan)
- */
+// STRICT: plan first, section second (no guessing)
 export function canAccess(plan: Plan, section: Section) {
   plan = normalizePlan(plan);
 
