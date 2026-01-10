@@ -66,9 +66,7 @@ export async function POST(req: NextRequest) {
     mode: "subscription",
     // ✅ this is what allows 100% off / -e invoices to pass without forcing a card
     payment_method_collection: "if_required",
-    allow_promotion_codes: true,
-
-    metadata: {
+    allow_promotion_codes: true,    metadata: {
       userId: user.id,
       tier,
     },
