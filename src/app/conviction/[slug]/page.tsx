@@ -66,7 +66,7 @@ export default async function ConvictionDetailPage({
     isAdmin = isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
   }
 
-  const allowed = isAdmin || canAccess("conviction", plan);
+  const allowed = isAdmin || canAccess(plan, "conviction");
   if (!allowed) return <LockedFull />;
 
   // Find idea then conviction

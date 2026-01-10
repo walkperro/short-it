@@ -28,21 +28,11 @@ export function planDisplay(plan: Plan) {
  *  - canAccess(plan, section)
  *  - canAccess(section, plan)
  */
-export function canAccess(a: Plan | Section, b: Plan | Section) {
-  let plan: Plan;
-  let section: Section;
-
-  if (a === "ideas" || a === "conviction" || a === "macro") {
-    section = a;
-    plan = normalizePlan(b);
-  } else {
-    plan = normalizePlan(a);
-    section = b as Section;
-  }
+export function canAccess(plan: Plan, section: Section) {
+  plan = normalizePlan(plan);
 
   if (plan === "macro") return true;
   if (plan === "conviction") return section !== "macro";
   if (plan === "ideas") return section === "ideas";
-  // free users can only see Ideas (teaser/locked UI handles the rest)
   return section === "ideas";
 }

@@ -123,7 +123,7 @@ export default async function ConvictionPage(props: {
     isAdmin = isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
   }
 
-  const allowed = isAdmin || canAccess("conviction", plan);
+  const allowed = isAdmin || canAccess(plan, "conviction");
 
   const kindParam = sp(searchParams.kind) || "all";
   const fromParam = sp(searchParams.from);

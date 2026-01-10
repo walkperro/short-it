@@ -73,7 +73,7 @@ export default async function MacroPage() {
   }
 
   const four = items.slice(0, 4);
-  const allowed = isAdmin || canAccess("macro", plan);
+  const allowed = isAdmin || canAccess(plan, "macro");
 
   return (
     <main className="mx-auto max-w-6xl p-6 text-white">
