@@ -61,9 +61,10 @@ export default function NavBar() {
 
   const plan = normalizePlan(me?.plan);
   const isAdmin = Boolean(me?.is_admin);
+  const ready = me !== null;
 
-  const lockConviction = !isAdmin && !canAccess(plan, "conviction");
-  const lockMacro = !isAdmin && !canAccess(plan, "macro");
+  const lockConviction = ready ? (!isAdmin && !canAccess(plan, "conviction")) : false;
+  const lockMacro = ready ? (!isAdmin && !canAccess(plan, "macro")) : false;
 
   const active = useMemo(() => {
     if (pathname?.startsWith("/macro")) return "macro";
