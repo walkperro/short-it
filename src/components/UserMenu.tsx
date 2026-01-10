@@ -110,7 +110,9 @@ export default function UserMenu() {
             <div className="h-px bg-white/10" />
 
             <div className="p-2">
-              <MenuLink href="/subscribe" onNavigate={close}>
+              <MenuLink href="/subscribe" onNavigate={close}
+<MenuLink href="/info" onNavigate={close}>Info</MenuLink>
+>
                 Plans
               </MenuLink>
 

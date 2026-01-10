@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 export default function InfoPage() {
   const [tab, setTab] = useState<"about" | "faq" | "contact">("about");
@@ -9,10 +10,20 @@ export default function InfoPage() {
   return (
     <main className="mx-auto max-w-3xl px-6 pb-24 pt-10 text-white">
       <header className="mb-10">
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="mb-2 text-xs tracking-[0.35em] text-white/35"
+        >
+          INFO
+        </motion.div>
+
         <h1 className="text-3xl font-semibold tracking-tight">
           About · FAQ · Contact
         </h1>
-        <p className="mt-2 text-sm text-white/60">
+
+        <p className="mt-2 text-sm leading-relaxed text-white/55">
           One place for how Short-It works, what we publish, and how to reach us.
         </p>
 
@@ -33,7 +44,7 @@ export default function InfoPage() {
       {tab === "faq" && <FAQ />}
       {tab === "contact" && <Contact />}
 
-      <footer className="mt-16 text-sm text-white/50">
+      <footer className="mt-16 text-sm text-white/40">
         <Link href="/" className="underline underline-offset-4">
           Back Home
         </Link>
@@ -42,157 +53,50 @@ export default function InfoPage() {
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function TabButton({ active, onClick, children }: any) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-full px-4 py-1.5 text-sm transition ${
+      className={[
+        "rounded-full px-4 py-1.5 text-sm transition border border-white/10",
         active
           ? "bg-white text-black"
-          : "bg-white/10 text-white hover:bg-white/20"
-      }`}
+          : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white/85",
+      ].join(" ")}
     >
       {children}
     </button>
   );
 }
 
+function GlassCard({ title, children }: any) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+      {title && <p className="font-semibold text-white/90">{title}</p>}
+      <div className="mt-2 text-sm leading-relaxed text-white/70">{children}</div>
+    </div>
+  );
+}
+
 function About() {
   return (
-    <section className="space-y-6">
-      <p>
-        <strong>Short-It</strong> is a trade-intel desk.
-      </p>
-
-      <p>
-        We publish detailed market ideas and context in a simple, timestamped
-        format.
-      </p>
-
-      <p>
-        Each post is archived and organized to help users track reasoning over
-        time and understand how ideas evolve within broader market conditions.
-      </p>
-
-      <p>
-        The goal is not prediction — it’s perspective.
-      </p>
-
-      <p>
-        Short-It exists to give users a clear way to view ideas within a broader
-        market lens, with detailed analysis and clear framing.
-      </p>
-
-      <h3 className="pt-6 text-sm font-semibold uppercase tracking-wide text-white/50">
-        How we write ideas
-      </h3>
-
-      <ul className="list-disc space-y-2 pl-5 text-white/80">
-        <li>Ticker</li>
-        <li>Type</li>
-        <li>Direction</li>
-        <li>Key levels</li>
-        <li>Context</li>
-      </ul>
-
-      <p>
-        This format is designed to make ideas easy to read, reference, and
-        compare over time — not to encourage impulsive action.
-      </p>
-
-      <p>
-        Ideas are meant to be starting points, not conclusions.
-      </p>
-
-      <h3 className="pt-6 text-sm font-semibold uppercase tracking-wide text-white/50">
-        About conviction & higher tiers
-      </h3>
-
-      <p>
-        Conviction and higher tiers are designed to expand perspective.
-      </p>
-
-      <p>
-        They provide deeper context and broader market framing — helping users
-        understand how individual ideas fit into larger market dynamics and
-        supporting their own decision-making process.
-      </p>
-
-      <p>
-        The focus shifts from individual setups to how historical and current
-        conditions and narratives interact across the market.
-      </p>
-
-      <h3 className="pt-6 text-sm font-semibold uppercase tracking-wide text-white/50">
-        Our approach
-      </h3>
-
-      <p>We don’t sell urgency.</p>
-      <p>We don’t sell certainty.</p>
-      <p>We don’t sell outcomes.</p>
-
-      <p className="font-semibold">We document intel.</p>
-
-      <p>
-        Short-It is built to support thoughtful analysis, personal risk
-        management, and independent judgment.
-      </p>
-
-      <p>
-        Use this platform as a reference — always do your own research, position
-        sizing, and risk assessment.
-      </p>
+    <section className="space-y-6 text-[15px] text-white/70">
+      <p className="font-semibold text-white/85">Short-It is a trade-intel desk.</p>
+      <p>We publish detailed market ideas and context in a simple, timestamped format.</p>
+      <p>The goal is not prediction — it’s perspective.</p>
     </section>
   );
 }
 
 function FAQ() {
   return (
-    <section className="space-y-6">
-      <Card
-        q="What is Short-It?"
-        a="Short-It is a trade-intel feed that publishes Ideas (Level I), Conviction writeups (Level II), and Macro perspective (Level III)."
-      />
-      <Card
-        q="Is this financial advice?"
-        a="No. Short-It is for informational and educational purposes only and should not be considered investment advice."
-      />
-      <Card
-        q="Why are some items locked?"
-        a="Some sections are member-only based on your plan. Upgrade to access additional levels and content."
-      />
-      <Card
-        q="How often is content updated?"
-        a="Updates vary with market conditions and available setups. Published items appear in the feed when ready."
-      />
-      <Card
-        q="Where can I manage my subscription?"
-        a="Go to the Account page from the user menu to manage your plan and access."
-      />
-      <Card
-        q="Do you offer an affiliate or referral program?"
-        a="We offer a limited affiliate program for approved partners. If you're interested in referring users to Short-It, contact us directly for details."
-      />
-      <Card
-        q="Are we missing something?"
-        a={
-          <>
-            Contact us directly for any other questions.
-            <br />
-            <Link href="/" className="mt-2 inline-block underline">
-              Back to Ideas
-            </Link>
-          </>
-        }
-      />
+    <section className="space-y-5">
+      <GlassCard title="What is Short-It?">
+        Ideas (Level I), Conviction (Level II), Macro (Level III).
+      </GlassCard>
+      <GlassCard title="Is this financial advice?">
+        No. Informational and educational only.
+      </GlassCard>
     </section>
   );
 }
@@ -200,40 +104,37 @@ function FAQ() {
 function Contact() {
   return (
     <section className="space-y-6">
-      <p className="font-medium">Contact & Support</p>
+      <GlassCard>
+        <div className="space-y-4">
+          <div>
+            <div className="text-xs tracking-[0.28em] text-white/35">
+              CONTACT & SUPPORT
+            </div>
+            <div className="mt-3 text-white/75">
+              short-it.trade@protonmail.com
+            </div>
+          </div>
 
-      <p className="text-white/80">short-it.trade@protonmail.com</p>
-
-      <p className="text-sm text-white/60">
-        We typically respond within 24–48 hours.
-      </p>
-
-      <div className="pt-4">
-        <p className="mb-2 text-sm uppercase tracking-wide text-white/50">
-          Follow Short-It
-        </p>
-
-        <div className="flex gap-4">
-          <a href="#" className="rounded-full bg-white/10 p-3">
-            X
-          </a>
-          <a href="#" className="rounded-full bg-white/10 p-3">
-            IG
-          </a>
-          <a href="#" className="rounded-full bg-white/10 p-3">
-            TikTok
-          </a>
+          <div className="flex gap-3">
+            <SocialIcon href="https://x.com/short_it_trade" label="X" />
+            <SocialIcon href="https://instagram.com/short_it.trade" label="IG" />
+            <SocialIcon href="https://tiktok.com/@short_it.trade" label="TikTok" />
+          </div>
         </div>
-      </div>
+      </GlassCard>
     </section>
   );
 }
 
-function Card({ q, a }: { q: string; a: React.ReactNode }) {
+function SocialIcon({ href, label }: any) {
   return (
-    <div className="rounded-2xl bg-white/5 p-5">
-      <p className="font-medium">{q}</p>
-      <p className="mt-2 text-sm text-white/80">{a}</p>
-    </div>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="grid h-12 w-12 place-items-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+    >
+      {label}
+    </a>
   );
 }
