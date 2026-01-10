@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { Resend } from "resend";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { sendShortItAccessEmail } from "@/lib/email/shortit";
 
 export const runtime = "nodejs";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
 });
-
-const resend = new Resend(process.env.RESEND_API_KEY!);
 
 function tierFromPriceId(priceId?: string | null) {
   if (!priceId) return null;
@@ -19,65 +17,16 @@ function tierFromPriceId(priceId?: string | null) {
   return null;
 }
 
-function shortItWelcomeHtml(tier: string) {
-  const tierLabel =
-    tier === "macro"
-      ? "Macro (LEVEL III)"
-      : tier === "conviction"
-      ? "Conviction (LEVEL II)"
-      : "Ideas (LEVEL I)";
-
-  return `
-  <div style="font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;background:#0b0b0f;color:#fff">
-    <div style="max-width:640px;margin:0 auto;border:1px solid rgba(255,255,255,.08);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.03)">
-      <div style="padding:22px 24px;border-bottom:1px solid rgba(255,255,255,.08)">
-        <div style="letter-spacing:.35em;font-size:11px;color:rgba(255,255,255,.45)">SHORT-IT</div>
-        <h1 style="margin:10px 0 0;font-size:20px;line-height:1.2">You’re in. ✅</h1>
-        <div style="margin-top:6px;color:rgba(255,255,255,.7);font-size:14px">Active plan: <b>${tierLabel}</b></div>
-      </div>
-
-      <div style="padding:20px 24px">
-        <p style="margin:0 0 14px;color:rgba(255,255,255,.75);font-size:14px;line-height:1.6">
-          Your subscription is active. Log in and everything will unlock based on your tier.
-        </p>
-
-        <a href="https://short-it.trade/account" target="_blank" rel="noopener"
-           style="display:inline-block;background:#fff;color:#000;padding:10px 14px;border-radius:999px;font-weight:700;text-decoration:none;font-size:14px">
-          Go to Account
-        </a>
-
-        <div style="margin-top:18px;padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(0,0,0,.25)">
-          <div style="font-weight:700;margin-bottom:6px">Quick start</div>
-          <ol style="margin:0;padding-left:18px;color:rgba(255,255,255,.75);font-size:14px;line-height:1.6">
-            <li>Check <b>Ideas</b> for fresh timestamps</li>
-            <li>Use <b>Conviction</b> for setups + reasoning</li>
-            <li><b>Macro</b> is the big-picture lens</li>
-          </ol>
-        </div>
-
-        <p style="margin-top:16px;color:rgba(255,255,255,.55);font-size:12px">
-          Need help? Reply to this email.
-        </p>
-      </div>
-    </div>
-  </div>`;
+function levelFromTier(tier: string) {
+  if (tier === "macro") return "LEVEL III";
+  if (tier === "conviction") return "LEVEL II";
+  return "LEVEL I";
 }
 
-async function sendShortItEmail(to: string, tier: string) {
-  const from = process.env.RESEND_FROM || "Short-It <team@short-it.trade>";
-  const subject =
-    tier === "macro"
-      ? "Macro unlocked — Short-It"
-      : tier === "conviction"
-      ? "Conviction unlocked — Short-It"
-      : "Ideas unlocked — Short-It";
-
-  return resend.emails.send({
-    from,
-    to,
-    subject,
-    html: shortItWelcomeHtml(tier),
-  });
+function planLabel(tier: string) {
+  if (tier === "macro") return "Macro";
+  if (tier === "conviction") return "Conviction";
+  return "Ideas";
 }
 
 export async function POST(req: Request) {
@@ -93,21 +42,17 @@ export async function POST(req: Request) {
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, secret);
   } catch (err: any) {
-    return NextResponse.json(
-      { error: `Webhook signature verification failed: ${err?.message}` },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: `Webhook signature verification failed: ${err?.message}` }, { status: 400 });
   }
 
   try {
-    // 1) Checkout completed -> set customer + plan immediately + send email
+    // 1) Checkout completed -> set plan immediately + send Short-It email
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
 
+      // ✅ IMPORTANT: we rely on session.metadata (set by checkout route)
       const userId = (session.metadata?.userId as string) || null;
       const tier = (session.metadata?.tier as string) || null;
-
-      // ✅ HARD GUARD: only handle Short-It checkouts that include our metadata
       if (!userId || !tier) return NextResponse.json({ received: true });
 
       const customerId = session.customer?.toString() ?? null;
@@ -120,20 +65,31 @@ export async function POST(req: Request) {
         })
         .eq("id", userId);
 
-      // Send Short-It email (works even if Stripe doesn't "charge"/no receipt)
-      const email =
+      // Email target: try session fields, else fetch Stripe customer email
+      let email =
         session.customer_details?.email ??
-        session.customer_email ??
-        undefined;
+        (session.customer_email as string | null) ??
+        null;
+
+      if (!email && customerId) {
+        const c = await stripe.customers.retrieve(customerId);
+        if (!("deleted" in c) && c.email) email = c.email;
+      }
 
       if (email) {
-        await sendShortItEmail(email, tier);
+        await sendShortItAccessEmail({
+          email,
+          plan: planLabel(tier),
+          level: levelFromTier(tier),
+          dashboardUrl: "https://short-it.trade/account",
+          billingUrl: "https://short-it.trade/account",
+        });
       }
 
       return NextResponse.json({ received: true });
     }
 
-    // 2) Subscription events -> update by customer id
+    // 2) Subscription events -> update by customer id (keeps plan in sync)
     if (
       event.type === "customer.subscription.created" ||
       event.type === "customer.subscription.updated" ||
@@ -159,12 +115,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true });
     }
 
-    // 3) Invoice paid -> keep plan in sync
+    // 3) Invoice paid -> keep plan in sync (some $0 invoices won't trigger Stripe receipts)
     if (event.type === "invoice.payment_succeeded") {
       const invoice = event.data.object as Stripe.Invoice;
 
       const customerId = invoice.customer?.toString() ?? null;
-      const subId = (((invoice as any).subscription) ?? null)?.toString?.() ?? null;
+      const subId = ((invoice as any).subscription ?? null)?.toString?.() ?? null;
 
       let priceId: string | null = null;
       if (subId) {
