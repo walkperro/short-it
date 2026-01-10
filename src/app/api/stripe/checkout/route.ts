@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   // email for receipts
   const { data: profile, error } = await supabaseAdmin
     .from("profiles")
-    .select("email")
+    .select("email, stripe_customer_id")
     .eq("id", user.id)
     .single();
 
@@ -37,13 +37,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Profile lookup failed" }, { status: 500 });
   }
 
+  // Ensure Stripe customer exists (better receipts + subscription linkage)
+  let customerId = (profile as any)?.stripe_customer_id ?? null;
+  const receiptEmail = (profile as any)?.email ?? user.email ?? undefined;
+
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      email: receiptEmail,
+      metadata: { userId: user.id },
+    });
+    customerId = customer.id;
+
+    await supabaseAdmin
+      .from("profiles")
+      .update({ stripe_customer_id: customerId })
+      .eq("id", user.id);
+  }
+
+
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (await getRequestBaseUrl());
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     payment_method_collection: "if_required",
     allow_promotion_codes: true,
-    customer_email: profile?.email ?? user.email ?? undefined,
+    customer: customerId,
     line_items: [{ price: PRICE_BY_TIER[tier]!, quantity: 1 }],
     success_url: `${siteUrl}/account?success=1`,
     cancel_url: `${siteUrl}/subscribe?canceled=1`,
