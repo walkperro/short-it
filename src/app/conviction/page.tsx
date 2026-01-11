@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FilterChips } from "@/components/FilterChips";
 import LockIcon from "@/components/LockIcon";
 import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -99,7 +100,7 @@ function LockedCard() {
 }
 
 export default async function ConvictionPage(props: {
-  searchParams?: Promise<{ kind?: string | string[]; from?: string | string[]; to?: string | string[] }>;
+  searchParams?: Promise<{ kind?: string | string[]; ticker?: string | string[]; from?: string | string[]; to?: string | string[] }>;
 }) {
   const searchParams = (props.searchParams ? await props.searchParams : {}) as any;
 
@@ -126,6 +127,7 @@ export default async function ConvictionPage(props: {
   const allowed = isAdmin || canAccess(plan, "conviction");
 
   const kindParam = sp(searchParams.kind) || "all";
+  const tickerParam = sp(searchParams.ticker);
   const fromParam = sp(searchParams.from);
   const toParam = sp(searchParams.to);
 
@@ -139,7 +141,11 @@ export default async function ConvictionPage(props: {
     )
     .eq("status","published").eq("ideas.status","published").order("published_at", { ascending: false, nullsFirst: false });
 
-  // filters (server-side) — same behavior as /ideas
+  
+  if (tickerParam) {
+    q = q.ilike("ideas.ticker", `%${tickerParam}%`);
+  }
+// filters (server-side) — same behavior as /ideas
   if (kindParam && kindParam !== "all") {
     q = q.ilike("ideas.kind", kindParam);
   }
@@ -172,7 +178,7 @@ export default async function ConvictionPage(props: {
         method="get"
         className="mt-6 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-4 md:flex-row md:items-end md:justify-between"
       >
-        <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-4">
           <div>
             <div className="text-xs tracking-widest text-white/50">TYPE</div>
             <select
@@ -187,7 +193,17 @@ export default async function ConvictionPage(props: {
               <option value="Buy Option">Buy Option</option>
               <option value="Sell Option">Sell Option</option>
             </select>
-          </div>
+            </div>
+
+            <div>
+              <div className="text-xs tracking-widest text-white/50">TICKER</div>
+              <input
+                name="ticker"
+                placeholder="SPY"
+                defaultValue={tickerParam || ""}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-white/20"
+              />
+            </div>
 
           <div>
             <div className="text-xs tracking-widest text-white/50">FROM</div>
@@ -225,6 +241,17 @@ export default async function ConvictionPage(props: {
           </Link>
         </div>
       </form>
+
+      <FilterChips
+        basePath="/conviction"
+        params={{
+          kind: kindParam && kindParam !== "all" ? kindParam : undefined,
+          from: fromParam || undefined,
+          to: toParam || undefined,
+          ticker: tickerParam || undefined,
+        }}
+        labelMap={{ kind: "TYPE", from: "FROM", to: "TO" }}
+      />
 
       {errorMsg ? (
         <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">

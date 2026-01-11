@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 };
 
 import Link from "next/link";
+import { FilterChips } from "@/components/FilterChips";
 import {
   createSupabaseServerClient,
   supabaseAdmin,
@@ -77,7 +78,7 @@ function nextDayStartISO(yyyy_mm_dd: string) {
 }
 
 export default async function IdeasPage(props: {
-  searchParams?: Promise<{ kind?: string | string[]; from?: string | string[]; to?: string | string[] }>;
+  searchParams?: Promise<{ kind?: string | string[]; ticker?: string | string[]; from?: string | string[]; to?: string | string[] }>;
 }) {
   const searchParams = (props.searchParams ? await props.searchParams : {}) as any;
 
@@ -104,6 +105,7 @@ export default async function IdeasPage(props: {
   const isFree = !isAdmin && plan === "free";
 
   const kindParam = sp(searchParams.kind) || "all";
+  const tickerParam = sp(searchParams.ticker);
   const fromParam = sp(searchParams.from);
   const toParam = sp(searchParams.to);
 
@@ -121,6 +123,9 @@ export default async function IdeasPage(props: {
   // filters (server-side)
   if (kindParam && kindParam !== "all") {
     q = q.ilike("kind", kindParam);
+  }
+  if (tickerParam) {
+    q = q.ilike("ticker", `%${tickerParam}%`);
   }
   if (fromParam) {
     const isoFrom = toDayStartISO(fromParam);
@@ -174,7 +179,7 @@ export default async function IdeasPage(props: {
         method="get"
         className="mt-6 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-4 md:flex-row md:items-end md:justify-between"
       >
-        <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-4">
           <div>
             <div className="text-xs tracking-widest text-white/50">TYPE</div>
             <select
@@ -189,6 +194,16 @@ export default async function IdeasPage(props: {
               <option value="Buy Option">Buy Option</option>
               <option value="Sell Option">Sell Option</option>
             </select>
+          </div>
+
+          <div>
+            <div className="text-xs tracking-widest text-white/50">TICKER</div>
+            <input
+              name="ticker"
+              placeholder="SPY"
+              defaultValue={tickerParam || ""}
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-white/20"
+            />
           </div>
 
           <div>
@@ -227,6 +242,17 @@ export default async function IdeasPage(props: {
           </Link>
         </div>
       </form>
+
+      <FilterChips
+        basePath="/ideas"
+        params={{
+          kind: kindParam && kindParam !== "all" ? kindParam : undefined,
+          ticker: tickerParam || undefined,
+          from: fromParam || undefined,
+          to: toParam || undefined,
+        }}
+        labelMap={{ kind: "TYPE", ticker: "TICKER", from: "FROM", to: "TO" }}
+      />
 
 
 

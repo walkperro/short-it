@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import LockIcon from "@/components/LockIcon";
 import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
@@ -7,6 +8,12 @@ import { canAccess, normalizePlan, type Plan } from "@/lib/entitlements";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+
+export const metadata: Metadata = {
+  title: "Conviction — SHORT-IT",
+  robots: { index: false, follow: false },
+};
 
 function fmtIdeaNo(n?: number | null) {
   if (!n) return "—";
