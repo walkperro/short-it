@@ -69,7 +69,7 @@ function accessHtml(plan: string, level: string, dashboardUrl: string, billingUr
       </div>
 
       <div style="margin-top:12px;font-size:11px;color:rgba(255,255,255,.35);text-align:center;">
-        Sent by Short-It • no-reply@short-it.trade
+        Sent by Short-It • no-reply@send.short-it.trade
       </div>
     </div>
   </div>`;
@@ -98,7 +98,7 @@ export async function sendShortItAccessEmail({
   dashboardUrl,
   billingUrl,
 }: SendShortItEmailArgs) {
-  const from = process.env.RESEND_FROM || "Short-It <no-reply@short-it.trade>";
+  const from = process.env.RESEND_FROM || "Short-It <no-reply@send.short-it.trade>";
   const replyTo = process.env.RESEND_REPLY_TO || undefined;
 
   return resend.emails.send({
