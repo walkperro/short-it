@@ -1,0 +1,15 @@
+# SHORT-IT — Trade Intel
+# Educational market analysis and tiered trade ideas (Ideas / Conviction / Macro).
+# Not financial advice.
+
+Site: https://short-it.trade
+
+Key pages:
+- https://short-it.trade/
+- https://short-it.trade/ideas
+- https://short-it.trade/pricing
+- https://short-it.trade/info
+
+Indexing:
+- Locked ideas are not indexable.
+- Public ideas may be indexed and summarized.
