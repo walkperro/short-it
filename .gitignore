@@ -45,3 +45,7 @@ next-env.d.ts
 .env
 .env.local
 .env.*.local
+
+# local source OG backgrounds (do not commit)
+/public/short_it_black_bg.png
+/public/short_it_white_bg.png

@@ -1,3 +1,23 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Ideas",
+  description: "Short-It Ideas — timestamped trade ideas in a clean, simple format.",
+  alternates: { canonical: "/ideas" },
+  openGraph: {
+    title: "Short-It Ideas",
+    description: "Timestamped trade ideas in a clean, simple format.",
+    url: "/ideas",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "SHORT-IT — Trade Intel" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Short-It Ideas",
+    description: "Timestamped trade ideas in a clean, simple format.",
+    images: ["/og.png"],
+  },
+};
+
 import Link from "next/link";
 import {
   createSupabaseServerClient,
