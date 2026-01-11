@@ -127,7 +127,7 @@ export default async function ConvictionPage(props: {
   const allowed = isAdmin || canAccess(plan, "conviction");
 
   const kindParam = sp(searchParams.kind) || "all";
-  const tickerParam = sp(searchParams.ticker);
+  const tickerParam = sp(searchParams.ticker).trim().toUpperCase();
   const fromParam = sp(searchParams.from);
   const toParam = sp(searchParams.to);
 
@@ -201,7 +201,7 @@ export default async function ConvictionPage(props: {
                 name="ticker"
                 placeholder="SPY"
                 defaultValue={tickerParam || ""}
-                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-white/20"
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-white/20 uppercase"
               />
             </div>
 
@@ -250,7 +250,7 @@ export default async function ConvictionPage(props: {
           to: toParam || undefined,
           ticker: tickerParam || undefined,
         }}
-        labelMap={{ kind: "TYPE", from: "FROM", to: "TO" }}
+        labelMap={{ kind: "TYPE", ticker: "TICKER", from: "FROM", to: "TO" }}
       />
 
       {errorMsg ? (
