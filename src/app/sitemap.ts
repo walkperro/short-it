@@ -5,12 +5,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
   // ONLY pages you want indexed
-  const paths = ["/", "/ideas", "/pricing", "/terms", "/privacy", "/info"];
+  const paths = ["/", "/ideas", "/pricing", "/info"];
 
   return paths.map((p) => ({
     url: `${site}${p}`,
     lastModified: now,
-    changeFrequency: "weekly" as const,
+    changeFrequency: "weekly",
     priority: p === "/" ? 1 : 0.7,
   }));
 }

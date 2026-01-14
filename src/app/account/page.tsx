@@ -1,3 +1,5 @@
+import ManageBillingButton from "@/components/billing/ManageBillingButton";
+
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -52,11 +54,13 @@ export default async function AccountPage() {
         <div className="mt-1 text-lg font-semibold">{is_admin ? "Admin" : planDisplay(displayPlan)}</div>
 
         <div className="mt-6 flex flex-wrap gap-3">
+          <ManageBillingButton />
+
           <Link
             href="/subscribe"
-            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10"
+            className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black"
           >
-            Manage billing / Upgrade
+            Upgrade
           </Link>
 
           {/* ✅ must POST to the API route */}

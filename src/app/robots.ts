@@ -12,8 +12,9 @@ export default function robots(): MetadataRoute.Robots {
         disallow: [
           "/api/",
           "/account/",
-            "/subscribe/",
           "/subscribe/",
+          "/conviction/",
+          "/*?*", // blocks filtered URLs from getting indexed
         ],
       },
     ],
