@@ -20,6 +20,19 @@ function fmtIdeaNo(n?: number | null) {
   return String(n).padStart(3, "0");
 }
 
+function fmtNY(iso: string) {
+  return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York" });
+}
+
+function directionLabel(direction?: string | null, optionSide?: string | null) {
+  const raw = String(direction ?? optionSide ?? "").toLowerCase();
+  if (raw === "long") return "LONG";
+  if (raw === "short") return "SHORT";
+  if (raw === "call") return "CALL";
+  if (raw === "put") return "PUT";
+  return "—";
+}
+
 function LockedFull() {
   return (
     <main className="mx-auto max-w-3xl p-6 text-white">
@@ -79,7 +92,7 @@ export default async function ConvictionDetailPage({
   // Find idea then conviction
   const { data: idea, error: ideaErr } = await supabaseAdmin
     .from("ideas")
-    .select("id,slug,idea_no,ticker,kind,created_at,published_at,status")
+    .select("id,slug,idea_no,ticker,kind,created_at,published_at,status,direction,option_side")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -143,12 +156,12 @@ export default async function ConvictionDetailPage({
             {idea.kind ?? "Conviction"}
           </h1>
           <div className="mt-2 text-xs text-white/40">
-            IDEA #{fmtIdeaNo(idea.idea_no)} • {new Date(ideaWhen).toLocaleString()}
+            IDEA #{fmtIdeaNo(idea.idea_no)} • {fmtNY(ideaWhen)}
           </div>
         </div>
 
-        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold">
-          {new Date(when).toLocaleString()}
+        <span className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-white/70">
+          {directionLabel((idea as any)?.direction ?? null, (idea as any)?.option_side ?? null)}
         </span>
       </div>
 

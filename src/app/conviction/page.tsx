@@ -51,6 +51,10 @@ function fmtIdeaNo(n?: number | null) {
   return String(n).padStart(3, "0");
 }
 
+function fmtNY(iso: string) {
+  return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York" });
+}
+
 
 
 function dirBadge(direction?: string | null, optionSide?: string | null) {
@@ -67,7 +71,7 @@ function dirBadge(direction?: string | null, optionSide?: string | null) {
 
 function LockedCard() {
   return (
-    <div className="relative min-w-[320px] max-w-[360px] shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-black/40 p-5">
+    <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black/40 p-5">
       <div className="pointer-events-none absolute inset-0 bg-black/10 backdrop-blur-[6px]" />
       <div className="relative">
         <div className="flex items-center justify-between">
@@ -259,7 +263,7 @@ export default async function ConvictionPage(props: {
         </div>
       ) : null}
 
-      <div className="mt-8 flex gap-4 overflow-x-auto pb-4">
+      <div className="mt-8 flex flex-col gap-4">
         {visible.map((c) => {
           if (!allowed) return <LockedCard key={`locked-${c.id}`} />;
 
@@ -271,7 +275,7 @@ export default async function ConvictionPage(props: {
             <Link
               key={c.id}
               href={slug ? `/conviction/${slug}` : "/conviction"}
-              className="min-w-[320px] max-w-[360px] shrink-0 rounded-2xl border border-white/10 bg-black/40 p-5 transition hover:border-white/20 hover:bg-black/60"
+              className="rounded-2xl border border-white/10 bg-black/40 p-5 transition hover:border-white/20 hover:bg-black/60"
             >
               <div className="flex items-center justify-between">
                 <div className="text-xs tracking-widest text-white/50">
@@ -291,7 +295,7 @@ export default async function ConvictionPage(props: {
 
               <p className="mt-3 text-sm text-white/70 line-clamp-4">{c.body || "—"}</p>
 
-              <div className="mt-4 text-xs text-white/40">{new Date(when).toLocaleString()}</div>
+              <div className="mt-4 text-xs text-white/40">{fmtNY(when)}</div>
             </Link>
           );
         })}
