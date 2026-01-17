@@ -76,3 +76,15 @@ body {
 .level-fade {
   animation: levelFadeIn 700ms ease-out both;
 }
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  55% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes luxpop {
+  0%   { transform: scale(1); }
+  60%  { transform: scale(1.045); }
+  100% { transform: scale(1); }
+}

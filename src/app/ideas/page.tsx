@@ -177,69 +177,82 @@ export default async function IdeasPage(props: {
       <form
         action="/ideas"
         method="get"
-        className="mt-6 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-4 md:flex-row md:items-end md:justify-between"
+        className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 md:mt-6 md:rounded-3xl md:p-4 md:flex md:flex-row md:items-end md:justify-between"
       >
-        <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-4">
-          <div>
-            <div className="text-xs tracking-widest text-white/50">TYPE</div>
-            <select
-              name="kind"
-              defaultValue={kindParam || "all"}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-white/20"
+        <input id="filters-open" type="checkbox" className="peer hidden" />
+        <label
+          htmlFor="filters-open"
+          className="mb-3 flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-3 md:hidden peer-checked:[&_.filters-plus]:opacity-0 peer-checked:[&_.filters-plus]:scale-90 peer-checked:[&_.filters-x]:opacity-100 peer-checked:[&_.filters-x]:scale-100 peer-checked:[&_.filters-x]:animate-luxpop">
+          <span className="text-xs tracking-widest text-white/60">FILTERS</span>
+          <span className="relative inline-flex h-6 w-6 items-center justify-center text-lg font-light text-white/60">
+            <span className="filters-plus transition-all duration-300 ease-out opacity-100 scale-100">+</span>
+            <span className="filters-x absolute inset-0 flex items-center justify-center opacity-0 scale-90 transition-all duration-300 ease-out">×</span>
+          </span>
+        </label>
+
+        <div className="overflow-hidden transition-all duration-200 ease-out max-h-0 opacity-0 -translate-y-2 pointer-events-none peer-checked:max-h-[520px] peer-checked:opacity-100 peer-checked:translate-y-0 peer-checked:pointer-events-auto md:max-h-none md:opacity-100 md:translate-y-0 md:overflow-visible md:pointer-events-auto">
+          <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-4">
+            <div>
+              <div className="text-xs tracking-widest text-white/50">TYPE</div>
+              <select
+                name="kind"
+                defaultValue={kindParam || "all"}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white outline-none focus:border-white/20"
+              >
+                <option value="all">All</option>
+                <option value="Equity">Equity</option>
+                <option value="ETF">ETF</option>
+                <option value="Commodity">Commodity</option>
+                <option value="Buy Option">Buy Option</option>
+                <option value="Sell Option">Sell Option</option>
+              </select>
+            </div>
+
+            <div>
+              <div className="text-xs tracking-widest text-white/50">TICKER</div>
+              <input
+                name="ticker"
+                placeholder="SPY"
+                defaultValue={tickerParam || ""}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white outline-none focus:border-white/20 uppercase"
+              />
+            </div>
+
+            <div>
+              <div className="text-xs tracking-widest text-white/50">FROM</div>
+              <input
+                type="date"
+                name="from"
+                defaultValue={fromParam || ""}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white outline-none focus:border-white/20"
+              />
+            </div>
+
+            <div>
+              <div className="text-xs tracking-widest text-white/50">TO</div>
+              <input
+                type="date"
+                name="to"
+                defaultValue={toParam || ""}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white outline-none focus:border-white/20"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex gap-3 md:mt-0">
+            <button
+              type="submit"
+              className="rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-black"
             >
-              <option value="all">All</option>
-              <option value="Equity">Equity</option>
-              <option value="ETF">ETF</option>
-              <option value="Commodity">Commodity</option>
-              <option value="Buy Option">Buy Option</option>
-              <option value="Sell Option">Sell Option</option>
-            </select>
+              Apply
+            </button>
+            <Link
+              href="/ideas"
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10"
+            >
+              Clear
+            </Link>
           </div>
-
-          <div>
-            <div className="text-xs tracking-widest text-white/50">TICKER</div>
-            <input
-              name="ticker"
-              placeholder="SPY"
-              defaultValue={tickerParam || ""}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-white/20 uppercase"
-            />
-          </div>
-
-          <div>
-            <div className="text-xs tracking-widest text-white/50">FROM</div>
-            <input
-              type="date"
-              name="from"
-              defaultValue={fromParam || ""}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-white/20"
-            />
-          </div>
-
-          <div>
-            <div className="text-xs tracking-widest text-white/50">TO</div>
-            <input
-              type="date"
-              name="to"
-              defaultValue={toParam || ""}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-white/20"
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            type="submit"
-            className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black"
-          >
-            Apply
-          </button>
-          <Link
-            href="/ideas"
-            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80 hover:bg-white/10"
-          >
-            Clear
-          </Link>
         </div>
       </form>
 
