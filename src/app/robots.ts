@@ -1,23 +1,25 @@
 import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade";
+  const host = site.replace(/^https?:\/\//, "");
+
   return {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/ideas", "/pricing", "/info"],
+        allow: "/",
         disallow: [
-          "/admin",
-          "/account",
-          "/login",
-          "/subscribe",
-          "/macro",
-          "/conviction",
-          "/reset-password",
-          "/update-password",
+          "/api/",
+          "/account/",
+          "/subscribe/",
+          "/ideas/*/full",
+          "/conviction/*/full",
+          "/*?*", // blocks filtered URLs from getting indexed
         ],
       },
     ],
-    sitemap: "https://short-it.trade/sitemap.xml",
+    sitemap: `${site}/sitemap.xml`,
+    host,
   };
 }

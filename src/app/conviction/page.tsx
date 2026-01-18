@@ -289,7 +289,7 @@ export default async function ConvictionPage(props: {
           return (
             <Link
               key={c.id}
-              href={slug ? `/conviction/${slug}` : "/conviction"}
+              href={slug ? (allowed ? `/conviction/${slug}/full` : `/conviction/${slug}`) : "/conviction"}
               className="rounded-2xl border border-white/10 bg-black/40 p-5 transition hover:border-white/20 hover:bg-black/60"
             >
               <div className="flex items-center justify-between">

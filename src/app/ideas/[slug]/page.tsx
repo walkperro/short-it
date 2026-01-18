@@ -1,111 +1,77 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getRequestBaseUrl } from "@/lib/server-url";
+import { notFound } from "next/navigation";
 import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { normalizePlan, type Plan } from "@/lib/entitlements";
-import { ideaTitle, ideaDescription, ideaJsonLd } from "@/lib/seo/idea";
-
-type Idea = {
-  id: string;
-  slug: string;
-  idea_no: number | null;
-  created_at: string;
-  published_at: string | null;
-  status: string;
-  locked: boolean;
-  kind: string | null;
-  ticker: string | null;
-  direction: string | null;
-  option_side: string | null;
-  entry: string | null;
-  reach: string | null;
-  strike: string | null;
-  exp: string | null;
-  context: string | null;
-};
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-async function loadIdea(rawSlug: string) {
-  // exact match first
-  let { data: idea, error } = await supabaseAdmin
-    .from("ideas")
-    .select(
-      "id,slug,idea_no,created_at,published_at,status,locked,kind,ticker,direction,option_side,entry,reach,strike,exp,context",
-    )
-    .eq("slug", rawSlug)
-    .maybeSingle();
+type IdeaRow = {
+  id: string;
+  slug: string;
+  idea_no?: number | null;
+  created_at: string;
+  published_at?: string | null;
+  kind?: string | null;
+  ticker: string;
+  direction?: "long" | "short" | null;
+  option_side?: "call" | "put" | null;
+  summary?: string | null;
+  context?: string | null;
+};
 
-  // fallback prefix match (your existing behavior)
-  if ((!idea || error) && rawSlug && rawSlug.length >= 6) {
-    const res2 = await supabaseAdmin
-      .from("ideas")
-      .select(
-        "id,slug,idea_no,created_at,published_at,status,locked,kind,ticker,direction,option_side,entry,reach,strike,exp,context",
-      )
-      .ilike("slug", `${rawSlug}%`)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+function pad3(n: number) {
+  return String(n).padStart(3, "0");
+}
 
-    if (res2.data?.slug && res2.data.slug !== rawSlug) {
-      redirect(`/ideas/${res2.data.slug}`);
-    }
-    idea = res2.data ?? idea;
-    error = res2.error ?? error;
-  }
+function clampText(s: string, n: number) {
+  const t = (s ?? "").trim();
+  if (!t) return "";
+  return t.length <= n ? t : `${t.slice(0, n).trimEnd()}…`;
+}
 
-  if (error || !idea || idea.status !== "published") return null;
-  return idea as Idea;
+function dirBadge(direction?: string | null, optionSide?: string | null) {
+  const raw = (direction ?? optionSide ?? "—") as any;
+  const up = String(raw).toUpperCase();
+  const cls =
+    raw === "long" || raw === "call"
+      ? "bg-emerald-500/15 text-emerald-400"
+      : raw === "short" || raw === "put"
+      ? "bg-red-500/15 text-red-400"
+      : "bg-white/10 text-white/80";
+  return { up, cls };
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const { slug: rawSlug } = await params;
-  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade";
+  const { slug } = await params;
 
-  const idea = await loadIdea(rawSlug);
-  if (!idea) {
-    return {
-      title: "Idea — SHORT-IT",
-      robots: { index: false, follow: false },
-    };
-  }
+  const { data } = await supabaseAdmin
+    .from("ideas_public")
+    .select("ticker,idea_no,summary,context")
+    .eq("slug", slug)
+    .maybeSingle();
 
-  const title = ideaTitle(idea);
-  const description = ideaDescription(idea);
-
-  // IMPORTANT: locked ideas should not be indexed
-  const noindex = Boolean(idea.locked);
+  const titleCore = data?.ticker ? `${data.ticker} — Idea` : "Idea";
+  const title = data?.idea_no ? `${titleCore} #${pad3(Number(data.idea_no))}` : titleCore;
+  const description = clampText((data?.summary ?? data?.context ?? "Teaser for a Short-It trade idea.") as any, 160);
 
   return {
     title,
     description,
-    alternates: { canonical: `/ideas/${idea.slug}` },
-    robots: noindex ? { index: false, follow: false } : { index: true, follow: true },
-    openGraph: {
-      type: "article",
-      url: `/ideas/${idea.slug}`,
-      title,
-      description,
-      images: [{ url: "/og.png", width: 1200, height: 630, alt: title }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: ["/og.png"],
-    },
+    robots: { index: true, follow: true },
+    alternates: { canonical: `/ideas/${slug}` },
+    openGraph: { title, description, url: `/ideas/${slug}`, images: [{ url: "/og.png", width: 1200, height: 630, alt: "SHORT-IT — Trade Intel" }] },
+    twitter: { card: "summary_large_image", title, description, images: ["/og.png"] },
   };
 }
 
-export default async function IdeaDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug: rawSlug } = await params;
+export default async function IdeaTeaserPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
 
-  // User is optional now (SEO/public crawl works)
+  // Determine viewer plan (so we can show a "View full" button for paid)
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -123,137 +89,78 @@ export default async function IdeaDetailPage({ params }: { params: Promise<{ slu
     isAdmin = isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
   }
 
-  const idea = await loadIdea(rawSlug);
+  const isFree = !isAdmin && plan === "free";
 
-  if (!idea) {
-    return (
-      <main className="mx-auto max-w-3xl p-6 text-white">
-        <div className="rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200">
-          This idea couldn't be loaded.
-        </div>
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white">
-          <span className="text-white/60">Slug:</span>{" "}
-          <span className="font-mono">{rawSlug}</span>
-        </div>
-        <Link href="/ideas" className="mt-4 inline-block text-sm underline underline-offset-4">
-          Back to Ideas
-        </Link>
-      </main>
-    );
-  }
+  const { data: idea } = await supabaseAdmin
+    .from("ideas_public")
+    .select("id,slug,idea_no,created_at,published_at,kind,ticker,direction,option_side,summary,context")
+    .eq("slug", slug)
+    .maybeSingle();
 
-  // Lock rule: if idea is locked and user isn't admin and plan is free -> locked UI
-  const isLocked = !isAdmin && plan === "free" && Boolean(idea.locked);
+  if (!idea) return notFound();
 
-  // CTA: check if a published conviction exists
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (await getRequestBaseUrl());
-  let hasConviction = false;
-  try {
-    const res = await fetch(`${baseUrl}/api/convictions/${idea.slug}`, { cache: "no-store" });
-    hasConviction = res.ok;
-  } catch {}
-
-  const badge = (idea.direction ?? idea.option_side ?? "—").toUpperCase();
+  const i = idea as any as IdeaRow;
+  const when = i.published_at ?? i.created_at;
+  const preview = clampText((i.summary ?? i.context ?? "") as any, 280);
+  const b = dirBadge(i.direction ?? null, i.option_side ?? null);
 
   return (
     <main className="mx-auto max-w-3xl p-6 text-white">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <div className="level-fade text-xs tracking-[0.35em] text-white/40">LEVEL I</div>
+          <div className="text-xs tracking-[0.35em] text-white/40">LEVEL I</div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            {idea.ticker ?? "—"} <span className="text-white/40">•</span>{" "}
-            {idea.kind ?? "Idea"}
+            {i.ticker} <span className="text-white/40">•</span> Idea #{i.idea_no ? pad3(Number(i.idea_no)) : "—"}
           </h1>
-          <div className="mt-2 text-xs text-white/40">
-            {new Date(idea.published_at ?? idea.created_at).toLocaleString()}
-          </div>
+          <div className="mt-2 text-xs text-white/40">{new Date(when as any).toLocaleString()}</div>
         </div>
 
-        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold">
-          {badge}
-        </span>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${b.cls}`}>{b.up}</span>
       </div>
 
-      {isLocked ? (
-        <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
-          <div className="text-xl font-semibold">Locked</div>
-          <p className="mt-2 text-sm text-white/60">Upgrade to unlock full details.</p>
-          <Link
-            href="/subscribe"
-            className="mt-5 inline-flex rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black"
-          >
-            Upgrade
-          </Link>
-        </div>
-      ) : (
-        <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
-            <Field label="Ticker" value={idea.ticker ?? "—"} />
-            <Field label="Type" value={idea.kind ?? "—"} />
-            <Field label="Direction" value={badge} />
-            <Field label="Entry" value={idea.entry ?? "—"} />
-            <Field label="Target" value={idea.reach ?? "—"} />
-            {isOptionKind(idea.kind) ? (
-              <>
-                <Field label="Strike" value={idea.strike ?? "—"} />
-                <Field label="Exp" value={idea.exp ?? "—"} />
-              </>
-            ) : null}
-          </div>
-
-          {idea.context ? (
-            <div className="mt-6">
-              <div className="text-xs tracking-widest text-white/40">Context</div>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-white/70">{idea.context}</p>
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      <Link
-        href={hasConviction ? `/conviction/${idea.slug}` : "/conviction"}
-        className="group mt-5 block rounded-3xl border border-white/10 bg-white/5 p-5 relative overflow-hidden transition-all duration-300 hover:-translate-y-[1px] hover:border-white/25 hover:bg-white/[0.06] hover:shadow-[0_10px_30px_rgba(0,0,0,0.35),inset_0_0_0_1px_rgba(255,255,255,0.04)] active:translate-y-0"
-      >
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-40 transition-opacity duration-300 group-hover:opacity-70" />
+      <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
         <div className="flex items-center justify-between">
-          <div className="text-base font-semibold tracking-tight uppercase">Read the full conviction</div>
-          <span className="inline-block text-white/50 transition-transform duration-300 group-hover:translate-x-0.5">
-            →
-          </span>
+          <div className="text-xs tracking-widest text-white/50">TEASER</div>
+          {!isFree ? (
+            <Link href={`/ideas/${slug}/full`} className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black">
+              View full
+            </Link>
+          ) : (
+            <Link href="/subscribe" className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black">
+              Upgrade
+            </Link>
+          )}
         </div>
 
-        <div className="mt-2 text-[11px] tracking-[0.22em] text-white/35">
-          Thesis • Time Expectations • Catalysts
+        <div className="mt-4 grid grid-cols-1 gap-2">
+          <div className="text-sm text-white/80">
+            <span className="text-xs tracking-widest text-white/40">TYPE</span>{" "}
+            <span className="ml-2">{i.kind ?? "—"}</span>
+          </div>
+          <div className="text-sm text-white/80">
+            <span className="text-xs tracking-widest text-white/40">DETAILS</span>{" "}
+            <span className="ml-2 text-white/60">Entry/targets are members-only.</span>
+          </div>
         </div>
-      </Link>
 
-      <Link href="/ideas" className="mt-6 inline-block text-sm underline underline-offset-4">
-        Back to Ideas
-      </Link>
+        {preview ? (
+          <div className="mt-5">
+            <div className="text-xs tracking-widest text-white/40">WHY IT’S ON THE RADAR</div>
+            <p className="mt-2 text-sm text-white/70 whitespace-pre-wrap">{preview}</p>
+          </div>
+        ) : (
+          <p className="mt-5 text-sm text-white/60">Upgrade to see the full rationale and levels.</p>
+        )}
+      </div>
 
-      {/* JSON-LD for AI search + Google */}
-      <Script
-        id="idea-jsonld"
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
-            ideaJsonLd(process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade", idea)
-          ),
-        }}
-      />
+      <div className="mt-5 flex gap-3">
+        <Link href="/ideas" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10">
+          Back to Ideas
+        </Link>
+        <Link href="/subscribe" className="rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm text-white hover:bg-white/15 transition">
+          Become a member
+        </Link>
+      </div>
     </main>
-  );
-}
-
-function isOptionKind(kind: string | null | undefined) {
-  return kind === "Buy Option" || kind === "Sell Option";
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="text-xs tracking-widest text-white/40">{label}</div>
-      <div className="text-sm font-semibold">{value}</div>
-    </div>
   );
 }

@@ -19,12 +19,6 @@ function fmtNY(iso: string) {
   return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York" });
 }
 
-function clampText(s: string, n: number) {
-  const t = (s ?? "").trim();
-  if (!t) return "";
-  return t.length <= n ? t : `${t.slice(0, n).trimEnd()}…`;
-}
-
 function dirBadge(direction?: string | null, optionSide?: string | null) {
   const raw = (direction ?? optionSide ?? "—") as any;
   const up = String(raw).toUpperCase();
@@ -35,6 +29,26 @@ function dirBadge(direction?: string | null, optionSide?: string | null) {
       ? "bg-red-500/15 text-red-400"
       : "bg-white/10 text-white/80";
   return { up, cls };
+}
+
+function LockedFull() {
+  return (
+    <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
+      <div className="flex items-center gap-2 text-xs text-white/60">
+        <LockIcon className="h-4 w-4 text-white/60" /> Locked
+      </div>
+      <div className="mt-2 text-xl font-semibold">Upgrade to unlock full Conviction</div>
+      <p className="mt-2 text-sm text-white/70">This page is available to Conviction+ members.</p>
+      <div className="mt-5 flex gap-3">
+        <Link href="/subscribe" className="rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-black">
+          Upgrade
+        </Link>
+        <Link href="/conviction" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10">
+          Back
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -48,17 +62,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const titleCore = data?.ticker ? `${data.ticker} — Conviction` : "Conviction";
   const title = data?.idea_no ? `${titleCore} #${fmtIdeaNo(Number(data.idea_no))}` : titleCore;
-  const description = clampText((data?.summary ?? data?.context ?? "Teaser for a Short-It Conviction write-up.") as any, 160);
+  const description = (data?.summary ?? data?.context ?? "Full conviction write-up.").slice(0, 160);
 
   return {
     title,
     description,
-    robots: { index: true, follow: true },
+    robots: { index: false, follow: false }, // FULL pages should not be indexed
     alternates: { canonical: `/conviction/${slug}` },
   };
 }
 
-export default async function ConvictionTeaserPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ConvictionFullPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
   const supabase = await createSupabaseServerClient();
@@ -89,13 +103,19 @@ export default async function ConvictionTeaserPage({ params }: { params: Promise
     .maybeSingle();
 
   if (error || !data) return notFound();
+  if (!allowed) {
+    return (
+      <main className="mx-auto max-w-3xl p-6 text-white">
+        <div className="text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Conviction</h1>
+        <LockedFull />
+      </main>
+    );
+  }
 
   const idea = (data as any).ideas ?? null;
   const when = (data as any).published_at || (data as any).created_at;
   const b = dirBadge(idea?.direction ?? null, idea?.option_side ?? null);
-
-  const body = String((data as any).body ?? "");
-  const teaser = clampText(body, 320);
 
   return (
     <main className="mx-auto max-w-3xl p-6 text-white">
@@ -108,50 +128,17 @@ export default async function ConvictionTeaserPage({ params }: { params: Promise
           <div className="mt-2 text-xs text-white/40">{fmtNY(when)}</div>
         </div>
 
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${b.cls}`}>{b.up}</span>
+        <div className="flex items-center gap-3">
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${b.cls}`}>{b.up}</span>
+          <Link href={`/conviction/${slug}`} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">
+            View teaser
+          </Link>
+        </div>
       </div>
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
-        <div className="flex items-center justify-between">
-          <div className="text-xs tracking-widest text-white/50">TEASER</div>
-
-          {allowed ? (
-            <Link href={`/conviction/${slug}/full`} className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black">
-              View full
-            </Link>
-          ) : (
-            <Link href="/subscribe" className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black">
-              Upgrade
-            </Link>
-          )}
-        </div>
-
-        {teaser ? (
-          <p className="mt-4 text-sm text-white/70 whitespace-pre-wrap">{teaser}</p>
-        ) : (
-          <p className="mt-4 text-sm text-white/60">Upgrade to see the full conviction write-up.</p>
-        )}
-
-        {!allowed ? (
-          <div className="mt-5 flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
-            <div className="flex items-center gap-2 text-xs text-white/60">
-              <LockIcon className="h-4 w-4 text-white/60" />
-              Full write-up is members-only
-            </div>
-            <Link href="/subscribe" className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15 transition">
-              Upgrade
-            </Link>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-5 flex gap-3">
-        <Link href="/conviction" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10">
-          Back
-        </Link>
-        <Link href="/subscribe" className="rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm text-white hover:bg-white/15 transition">
-          Become a member
-        </Link>
+        <div className="text-xs tracking-widest text-white/50">WRITE-UP</div>
+        <p className="mt-3 text-sm text-white/75 whitespace-pre-wrap">{(data as any).body || "—"}</p>
       </div>
     </main>
   );

@@ -283,7 +283,7 @@ export default async function IdeasPage(props: {
           return (
             <Link
               key={i.id}
-              href={`/ideas/${i.slug}`}
+              href={isFree ? `/ideas/${i.slug}` : `/ideas/${i.slug}/full`}
               className="block rounded-3xl border border-white/10 bg-black/40 p-5 hover:border-white/20 hover:bg-black/60 transition"
             >
               <div className="flex items-center justify-between">
