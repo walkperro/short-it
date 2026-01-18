@@ -1,3 +1,23 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Short-It — Trade Intel",
+  description: "Real-time trade ideas, conviction analysis, and macro intelligence for modern traders.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Short-It — Trade Intel",
+    description: "Real-time trade ideas, conviction analysis, and macro intelligence.",
+    url: "/",
+    images: [{ url: "/og.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Short-It — Trade Intel",
+    description: "Real-time trade ideas, conviction analysis, and macro intelligence.",
+    images: ["/og.png"],
+  },
+};
+
 import Link from "next/link";
 import { getRequestBaseUrl } from "@/lib/server-url";
 

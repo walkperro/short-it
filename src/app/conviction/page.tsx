@@ -27,6 +27,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+export const metadata = { robots: { index: false, follow: false } };
+
 function sp(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : (v ?? "");
 }
