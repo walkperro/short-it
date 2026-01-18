@@ -1,68 +1,51 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import LockIcon from "@/components/LockIcon";
-import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
+
+import {
+  createSupabaseServerClient,
+  supabaseAdmin,
+} from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { canAccess, normalizePlan, type Plan } from "@/lib/entitlements";
+import { ideaJsonLd } from "@/lib/seo/jsonld";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function fmtIdeaNo(n?: number | null) {
+type IdeaLite = {
+  slug: string | null;
+  idea_no: number | null;
+  ticker: string | null;
+  kind: string | null;
+  direction: string | null;
+  option_side: string | null;
+  created_at: string;
+  published_at: string | null;
+  summary: string | null;
+  context: string | null;
+};
+
+type ConvictionRow = {
+  id: string;
+  status: string | null;
+  created_at: string;
+  published_at: string | null;
+  body?: string | null; // only selected when allowed
+  ideas: IdeaLite | null;
+};
+
+function pad3(n?: number | null) {
   if (!n) return "—";
   return String(n).padStart(3, "0");
 }
 
-function fmtNY(iso: string) {
-  return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York" });
-}
-
-function clampText(s: string, n: number) {
-  const t = (s ?? "").trim();
-  if (!t) return "";
-  return t.length <= n ? t : `${t.slice(0, n).trimEnd()}…`;
-}
-
-function dirBadge(direction?: string | null, optionSide?: string | null) {
-  const raw = (direction ?? optionSide ?? "—") as any;
-  const up = String(raw).toUpperCase();
-  const cls =
-    raw === "long" || raw === "call"
-      ? "bg-emerald-500/15 text-emerald-400"
-      : raw === "short" || raw === "put"
-      ? "bg-red-500/15 text-red-400"
-      : "bg-white/10 text-white/80";
-  return { up, cls };
-}
-
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const { slug } = await params;
-
-  const { data } = await supabaseAdmin
-    .from("ideas_public")
-    .select("ticker,idea_no,summary,context")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  const titleCore = data?.ticker ? `${data.ticker} — Conviction` : "Conviction";
-  const title = data?.idea_no ? `${titleCore} #${fmtIdeaNo(Number(data.idea_no))}` : titleCore;
-  const description = clampText((data?.summary ?? data?.context ?? "Teaser for a Short-It Conviction write-up.") as any, 160);
-
-  return {
-    title,
-    description,
-    robots: { index: true, follow: true },
-    alternates: { canonical: `/conviction/${slug}` },
-  };
-}
-
-export default async function ConvictionTeaserPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-
+async function getViewerAccess() {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   let plan: Plan = "free";
   let isAdmin = false;
@@ -75,83 +58,169 @@ export default async function ConvictionTeaserPage({ params }: { params: Promise
       .maybeSingle();
 
     plan = normalizePlan(profile?.plan ?? "free") as Plan;
-    isAdmin = isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
+    isAdmin =
+      isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
   }
 
   const allowed = isAdmin || canAccess(plan, "conviction");
+  return { allowed };
+}
 
-  const { data, error } = await supabaseAdmin
+async function getConvictionByIdeaSlug(slug: string, includeBody: boolean) {
+  const selectBase =
+    "id,status,created_at,published_at,ideas:idea_id!inner(slug,idea_no,ticker,kind,direction,option_side,created_at,published_at,summary,context)";
+
+  const select = includeBody ? `${selectBase},body` : selectBase;
+
+  const { data } = await supabaseAdmin
     .from("convictions")
-    .select("id,idea_id,status,body,created_at,published_at,ideas:idea_id!inner(slug,idea_no,ticker,kind,direction,option_side,created_at,published_at,status)")
+    .select(select)
     .eq("status", "published")
     .eq("ideas.slug", slug)
-    .limit(1)
     .maybeSingle();
 
-  if (error || !data) return notFound();
+  return (data ?? null) as ConvictionRow | null;
+}
 
-  const idea = (data as any).ideas ?? null;
-  const when = (data as any).published_at || (data as any).created_at;
-  const b = dirBadge(idea?.direction ?? null, idea?.option_side ?? null);
+export async function generateMetadata(props: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await props.params;
+  
+const site = process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade";
+  const teaserUrl = `${site}/conviction/${slug}`;
 
-  const body = String((data as any).body ?? "");
-  const teaser = clampText(body, 320);
+  // metadata should be indexable; teaser content is safe for crawlers
+  const row = await getConvictionByIdeaSlug(slug, false);
+  if (!row?.ideas) return { title: "Conviction", robots: { index: false, follow: false } };
+
+  const t = row.ideas.ticker ? row.ideas.ticker.toUpperCase() : "Conviction";
+  const k = row.ideas.kind ? `• ${row.ideas.kind}` : "";
+  const n = row.ideas.idea_no ? `• #${pad3(row.ideas.idea_no)}` : "";
+
+  const title = `${t} Conviction ${k} ${n}`.replace(/\s+/g, " ").trim();
+  const desc =
+    row.ideas.summary ??
+    row.ideas.context ??
+    "Macro / conviction teaser — subscribe to unlock the full write-up.";
+
+  return {
+    title,
+    description: desc,
+    alternates: { canonical: `/conviction/${slug}` },
+    openGraph: {
+      title,
+      description: desc,
+      url: `/conviction/${slug}`,
+      images: [{ url: "/og.png", width: 1200, height: 630, alt: "SHORT-IT — Trade Intel" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description: desc,
+      images: ["/og.png"],
+    },
+  };
+}
+
+export default async function ConvictionTeaserPage(props: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await props.params;
+
+  const { allowed } = await getViewerAccess();
+  const row = await getConvictionByIdeaSlug(slug, allowed);
+  if (!row?.ideas) return notFound();
+
+  const idea = row.ideas;
+  const whenISO = (row.published_at ?? row.created_at) as any;
+
+  const teaser =
+    idea.summary ??
+    idea.context ??
+    "Subscribe to unlock the full conviction write-up.";
+
+  const jsonLd = ideaJsonLd({
+    ideaNo: idea.idea_no ?? null,
+    ticker: idea.ticker ?? null,
+    kind: idea.kind ?? "Conviction",
+    direction: (idea.direction ?? idea.option_side ?? null) as any,
+    publishedAt: idea.published_at ?? idea.created_at,
+    teaser,
+  });
 
   return (
-    <main className="mx-auto max-w-3xl p-6 text-white">
-      <div className="flex items-end justify-between gap-4">
+    <main className="mx-auto max-w-5xl p-6 text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
+      <div className="flex items-start justify-between gap-6">
         <div>
-          <div className="text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
+          <div className="level-fade text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            {idea?.ticker || "—"} <span className="text-white/40">•</span> Conviction #{fmtIdeaNo(idea?.idea_no)}
+            {idea.ticker ? idea.ticker.toUpperCase() : "Conviction"}{" "}
+            <span className="text-white/30">•</span>{" "}
+            <span className="text-white/80">{idea.kind ?? "Conviction"}</span>
           </h1>
-          <div className="mt-2 text-xs text-white/40">{fmtNY(when)}</div>
+          <div className="mt-2 text-sm text-white/60">
+            IDEA #{pad3(idea.idea_no)} • {new Date(whenISO).toLocaleString()}
+          </div>
         </div>
 
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${b.cls}`}>{b.up}</span>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/conviction"
+            className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10 transition"
+          >
+            Back
+          </Link>
+          {!allowed ? (
+            <Link
+              href="/subscribe"
+              className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black"
+            >
+              Subscribe
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
-        <div className="flex items-center justify-between">
-          <div className="text-xs tracking-widest text-white/50">TEASER</div>
-
-          {allowed ? (
-            <Link href={`/conviction/${slug}/full`} className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black">
-              View full
-            </Link>
-          ) : (
-            <Link href="/subscribe" className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black">
-              Upgrade
-            </Link>
-          )}
-        </div>
-
-        {teaser ? (
-          <p className="mt-4 text-sm text-white/70 whitespace-pre-wrap">{teaser}</p>
-        ) : (
-          <p className="mt-4 text-sm text-white/60">Upgrade to see the full conviction write-up.</p>
-        )}
+        <div className="text-xs tracking-widest text-white/40">PREVIEW</div>
+        <p className="mt-2 text-sm text-white/70 leading-relaxed">
+          {teaser}
+        </p>
 
         {!allowed ? (
-          <div className="mt-5 flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
-            <div className="flex items-center gap-2 text-xs text-white/60">
-              <LockIcon className="h-4 w-4 text-white/60" />
-              Full write-up is members-only
+          <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="text-sm text-white/80">
+              Conviction is a premium unlock. Subscribe to see the full write-up + ongoing updates.
             </div>
-            <Link href="/subscribe" className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15 transition">
-              Upgrade
-            </Link>
+            <div className="mt-4 flex gap-3">
+              <Link
+                href="/subscribe"
+                className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black"
+              >
+                Unlock access
+              </Link>
+              <Link
+                href="/ideas"
+                className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10 transition"
+              >
+                View Ideas
+              </Link>
+            </div>
           </div>
-        ) : null}
-      </div>
-
-      <div className="mt-5 flex gap-3">
-        <Link href="/conviction" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10">
-          Back
-        </Link>
-        <Link href="/subscribe" className="rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm text-white hover:bg-white/15 transition">
-          Become a member
-        </Link>
+        ) : (
+          <div className="mt-6">
+            <div className="text-xs tracking-widest text-white/40">FULL</div>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-white/80 leading-relaxed">
+              {row.body ?? "—"}
+            </p>
+          </div>
+        )}
       </div>
     </main>
   );

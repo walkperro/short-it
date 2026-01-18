@@ -1,3 +1,60 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+from pathlib import Path
+import textwrap
+
+ROOT = Path(__file__).resolve().parents[1]
+robots_path = ROOT / "src/app/robots.ts"
+sitemap_path = ROOT / "src/app/sitemap.ts"
+
+def write_if_changed(path: Path, content: str) -> bool:
+    if path.exists():
+        old = path.read_text(encoding="utf-8")
+        if old == content:
+            print(f"[OK] no change {path.as_posix()}")
+            return False
+        bak = path.with_suffix(path.suffix + ".bak")
+        bak.write_text(old, encoding="utf-8")
+        print(f"[BK] backup -> {bak.as_posix()}")
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    print(f"[OK] wrote {path.as_posix()}")
+    return True
+
+robots_new = textwrap.dedent("""\
+import type { MetadataRoute } from "next";
+
+export default function robots(): MetadataRoute.Robots {
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade";
+
+  return {
+    rules: [
+      {
+        userAgent: "*",
+        allow: "/",
+        // Keep private/auth stuff out of the index
+        disallow: [
+          "/api/",
+          "/admin",
+          "/account",
+          "/subscribe",
+          "/portal",
+          "/signin",
+          "/signup",
+          "/logout",
+          // Avoid duplicate thin pages from querystring filter URLs
+          "/*?*",
+        ],
+      },
+    ],
+    sitemap: `${site}/sitemap.xml`,
+    host: site,
+  };
+}
+""")
+
+sitemap_new = textwrap.dedent("""\
 import type { MetadataRoute } from "next";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
@@ -70,3 +127,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return out;
 }
+""")
+
+changed = False
+changed |= write_if_changed(robots_path, robots_new)
+changed |= write_if_changed(sitemap_path, sitemap_new)
+
+if not changed:
+    print("[INFO] Nothing changed. You're already patched.")
