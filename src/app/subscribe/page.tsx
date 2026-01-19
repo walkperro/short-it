@@ -48,6 +48,11 @@ export default function SubscribePage() {
   const [agreed, setAgreed] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [acceptedOk, setAcceptedOk] = useState(false);
+  const [pendingTier, setPendingTier] = useState<Exclude<
+    Tier,
+    "free" | "admin"
+  > | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function syncPlan() {
     try {
@@ -138,6 +143,12 @@ export default function SubscribePage() {
   }
 
   const currentRank = rankOf(plan);
+
+  function requestTierChange(nextTier: Exclude<Tier, "free" | "admin">) {
+    setErr(null);
+    setPendingTier(nextTier);
+    setConfirmOpen(true);
+  }
 
   async function goTier(nextTier: Exclude<Tier, "free" | "admin">) {
     setErr(null);
@@ -311,7 +322,7 @@ export default function SubscribePage() {
           included={isIncluded("ideas")}
           locked={isLockedTier("ideas")}
           disabled={loading || !agreed}
-          onClick={() => goTier("ideas")}
+          onClick={() => requestTierChange("ideas")}
         />
 
         <TierCard
@@ -322,7 +333,7 @@ export default function SubscribePage() {
           included={isIncluded("conviction")}
           locked={isLockedTier("conviction")}
           disabled={loading || !agreed}
-          onClick={() => goTier("conviction")}
+          onClick={() => requestTierChange("conviction")}
         />
 
         <TierCard
@@ -333,9 +344,76 @@ export default function SubscribePage() {
           included={isIncluded("macro")}
           locked={isLockedTier("macro")}
           disabled={loading || !agreed}
-          onClick={() => goTier("macro")}
+          onClick={() => requestTierChange("macro")}
         />
       </div>
+
+      {/* CONFIRM SWITCH MODAL */}
+      {confirmOpen && pendingTier ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 md:items-center">
+          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-black/90 p-6 shadow-2xl">
+            <div className="text-xs tracking-[0.35em] text-white/40">
+              CONFIRM
+            </div>
+            <div className="mt-2 text-2xl font-semibold">
+              {rankOf(pendingTier as any) > rankOf(plan as any)
+                ? "Upgrade"
+                : "Change plan"}{" "}
+              to {TIER_META[pendingTier].title}
+            </div>
+
+            <p className="mt-3 text-sm text-white/60">
+              {rankOf(pendingTier as any) > rankOf(plan as any)
+                ? "This may charge you immediately for the difference (proration) via Stripe."
+                : "Downgrades are recommended to take effect at your next renewal to avoid surprise charges."}
+            </p>
+
+            <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+              <div className="flex items-center justify-between">
+                <span>Current</span>
+                <span className="font-semibold capitalize">{plan}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span>New</span>
+                <span className="font-semibold">
+                  {TIER_META[pendingTier].title}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmOpen(false);
+                  setPendingTier(null);
+                }}
+                className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white/80 hover:bg-white/10"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const t = pendingTier;
+                  setConfirmOpen(false);
+                  setPendingTier(null);
+                  await goTier(t);
+                }}
+                className="flex-1 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black hover:opacity-95"
+              >
+                Confirm
+              </button>
+            </div>
+
+            <div className="mt-3 text-xs text-white/40">
+              You can always manage billing (cancel, payment method, invoices)
+              from Account → Manage billing.
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
