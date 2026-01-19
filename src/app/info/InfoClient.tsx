@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
 export default function InfoPage() {
-  const [tab, setTab] = useState<"about" | "faq" | "contact">("about");
+  const [tab, setTab] = useState<"about" | "faq" | "legal" | "contact">(
+    "about",
+  );
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const t = sp.get("tab");
+    if (t === "about" || t === "faq" || t === "legal" || t === "contact")
+      setTab(t);
+  }, []);
 
   return (
     <main className="mx-auto max-w-3xl px-6 pb-24 pt-10 text-white">
@@ -20,11 +29,12 @@ export default function InfoPage() {
         </motion.div>
 
         <h1 className="text-3xl font-semibold tracking-tight">
-          About · FAQ · Contact
+          About · FAQ · Legal · Contact
         </h1>
 
         <p className="mt-2 text-sm leading-relaxed text-white/55">
-          One place for how Short-It works, what we publish, and how to reach us.
+          One place for how Short-It works, what we publish, and how to reach
+          us.
         </p>
 
         <div className="mt-6 flex gap-3">
@@ -34,7 +44,13 @@ export default function InfoPage() {
           <TabButton active={tab === "faq"} onClick={() => setTab("faq")}>
             FAQ
           </TabButton>
-          <TabButton active={tab === "contact"} onClick={() => setTab("contact")}>
+          <TabButton active={tab === "legal"} onClick={() => setTab("legal")}>
+            Legal
+          </TabButton>
+          <TabButton
+            active={tab === "contact"}
+            onClick={() => setTab("contact")}
+          >
             Contact
           </TabButton>
         </div>
@@ -42,6 +58,7 @@ export default function InfoPage() {
 
       {tab === "about" && <About />}
       {tab === "faq" && <FAQ />}
+      {tab === "legal" && <Legal />}
       {tab === "contact" && <Contact />}
 
       <footer className="mt-16 text-sm text-white/40">
@@ -88,7 +105,9 @@ function GlassCard({
   return (
     <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
       {title ? <p className="font-semibold text-white/90">{title}</p> : null}
-      <div className="mt-2 text-sm leading-relaxed text-white/70">{children}</div>
+      <div className="mt-2 text-sm leading-relaxed text-white/70">
+        {children}
+      </div>
     </div>
   );
 }
@@ -96,7 +115,9 @@ function GlassCard({
 function About() {
   return (
     <section className="space-y-6 text-[15px] text-white/70">
-      <p className="font-semibold text-white/85">Short-It is a trade-intel desk.</p>
+      <p className="font-semibold text-white/85">
+        Short-It is a trade-intel desk.
+      </p>
 
       <p>
         We publish detailed market ideas and context in a simple, timestamped
@@ -113,9 +134,12 @@ function About() {
       </p>
 
       <div className="pt-2">
-        <div className="text-xs tracking-[0.28em] text-white/35">HOW WE WRITE IDEAS</div>
+        <div className="text-xs tracking-[0.28em] text-white/35">
+          HOW WE WRITE IDEAS
+        </div>
         <p className="mt-3 text-white/70">
-          Every idea follows the same core structure for clarity and ease of review:
+          Every idea follows the same core structure for clarity and ease of
+          review:
         </p>
 
         <ul className="mt-3 list-disc space-y-2 pl-6 text-white/70">
@@ -127,11 +151,13 @@ function About() {
         </ul>
 
         <p className="mt-4 text-white/70">
-          This format is designed to make ideas easy to read, reference, and compare
-          over time — not to encourage impulsive action.
+          This format is designed to make ideas easy to read, reference, and
+          compare over time — not to encourage impulsive action.
         </p>
 
-        <p className="mt-3 text-white/70">Ideas are meant to be starting points, not conclusions.</p>
+        <p className="mt-3 text-white/70">
+          Ideas are meant to be starting points, not conclusions.
+        </p>
       </div>
 
       <div className="pt-6">
@@ -145,8 +171,8 @@ function About() {
 
         <p className="mt-3 text-white/70">
           They provide deeper context and broader market framing — helping users
-          understand how individual ideas fit into larger market dynamics and supporting
-          their own decision-making process.
+          understand how individual ideas fit into larger market dynamics and
+          supporting their own decision-making process.
         </p>
 
         <p className="mt-3 text-white/70">
@@ -156,7 +182,9 @@ function About() {
       </div>
 
       <div className="pt-6">
-        <div className="text-xs tracking-[0.28em] text-white/35">OUR APPROACH</div>
+        <div className="text-xs tracking-[0.28em] text-white/35">
+          OUR APPROACH
+        </div>
 
         <div className="mt-4 space-y-2 text-white/70">
           <p>We don’t sell urgency.</p>
@@ -166,13 +194,13 @@ function About() {
         </div>
 
         <p className="mt-4 text-white/70">
-          Short-It is built to support thoughtful analysis, personal risk management,
-          and independent judgment.
+          Short-It is built to support thoughtful analysis, personal risk
+          management, and independent judgment.
         </p>
 
         <p className="mt-3 text-white/70">
-          Use this platform as a reference — always do your own research, position sizing,
-          and risk assessment.
+          Use this platform as a reference — always do your own research,
+          position sizing, and risk assessment.
         </p>
       </div>
     </section>
@@ -183,41 +211,76 @@ function FAQ() {
   return (
     <section className="space-y-5">
       <GlassCard title="What is Short-It?">
-        Short-It is a trade-intel feed that publishes Ideas (Level I), Conviction writeups
-        (Level II), and Macro perspective (Level III).
+        Short-It is a trade-intel feed that publishes Ideas (Level I),
+        Conviction writeups (Level II), and Macro perspective (Level III).
       </GlassCard>
 
       <GlassCard title="Is this financial advice?">
-        No. Short-It is for informational and educational purposes only and should not be
-        considered investment advice.
+        No. Short-It is for informational and educational purposes only and
+        should not be considered investment advice.
       </GlassCard>
 
       <GlassCard title="Why are some items locked?">
-        Some sections are member-only based on your plan. Upgrade to access additional
-        levels and content.
+        Some sections are member-only based on your plan. Upgrade to access
+        additional levels and content.
       </GlassCard>
 
       <GlassCard title="How often is content updated?">
-        Updates vary with market conditions and available setups. Published items appear
-        in the feed when ready.
+        Updates vary with market conditions and available setups. Published
+        items appear in the feed when ready.
       </GlassCard>
 
       <GlassCard title="Where can I manage my subscription?">
-        Go to the Account page from the user menu to manage your plan and access.
+        Go to the Account page from the user menu to manage your plan and
+        access.
       </GlassCard>
 
       <GlassCard title="Do you offer an affiliate or referral program?">
-        We offer a limited affiliate program for approved partners. If you’re interested
-        in referring users to Short-It, contact us directly for details.
+        We offer a limited affiliate program for approved partners. If you’re
+        interested in referring users to Short-It, contact us directly for
+        details.
       </GlassCard>
 
       <GlassCard title="Are we missing something?">
         Contact us directly for any other questions.
         <div className="mt-3">
-          <Link href="/ideas" className="underline underline-offset-4 text-white/80 hover:text-white">
+          <Link
+            href="/ideas"
+            className="underline underline-offset-4 text-white/80 hover:text-white"
+          >
             Back to Ideas
           </Link>
         </div>
+      </GlassCard>
+    </section>
+  );
+}
+
+function Legal() {
+  return (
+    <section className="space-y-5">
+      <GlassCard title="Terms of Service (summary)">
+        Short-It provides educational market commentary. Content is
+        informational only and is not investment advice. You are responsible for
+        your own decisions and risk management.
+      </GlassCard>
+
+      <GlassCard title="Risk Disclosure / Disclaimer">
+        Trading and investing involve substantial risk, including possible total
+        loss. Past performance does not guarantee future results. Nothing on
+        Short-It constitutes a recommendation to buy or sell any security.
+      </GlassCard>
+
+      <GlassCard title="Refunds & Cancellation">
+        You can cancel anytime from your Account page via Manage billing.
+        Cancellation stops future renewals; access remains active until the end
+        of your current billing period. Unless explicitly stated otherwise, we
+        do not provide refunds or prorated credits.
+      </GlassCard>
+
+      <GlassCard title="Need the full agreement text?">
+        The current membership agreement is shown during checkout and must be
+        accepted before purchase.
       </GlassCard>
     </section>
   );
@@ -233,7 +296,9 @@ function Contact() {
               CONTACT & SUPPORT
             </div>
 
-            <div className="mt-3 text-white/75">short-it.trade@protonmail.com</div>
+            <div className="mt-3 text-white/75">
+              short-it.trade@protonmail.com
+            </div>
 
             <div className="mt-2 text-sm text-white/50">
               We typically respond within 24–48 hours.
@@ -295,7 +360,13 @@ function SocialIcon({
 
 function IconX() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M18.9 2H22l-6.77 7.74L23 22h-6.9l-5.4-6.98L4.6 22H2l7.25-8.3L1 2h7l4.87 6.28L18.9 2Z"
         stroke="currentColor"
@@ -308,7 +379,13 @@ function IconX() {
 
 function IconIG() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Z"
         stroke="currentColor"
@@ -331,7 +408,13 @@ function IconIG() {
 
 function IconTikTok() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M14 3v10.2a3.8 3.8 0 1 1-3-3.7"
         stroke="currentColor"

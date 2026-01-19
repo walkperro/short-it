@@ -19,7 +19,13 @@ function tierFromPriceId(priceId?: string | null) {
 
 // Highest tier wins if multiple subs exist
 function maxTier(a: string | null, b: string | null) {
-  const rank: Record<string, number> = { free: 0, ideas: 1, conviction: 2, macro: 3, admin: 99 };
+  const rank: Record<string, number> = {
+    free: 0,
+    ideas: 1,
+    conviction: 2,
+    macro: 3,
+    admin: 99,
+  };
   const aa = a ?? "free";
   const bb = b ?? "free";
   return rank[bb] > rank[aa] ? bb : aa;
@@ -27,8 +33,11 @@ function maxTier(a: string | null, b: string | null) {
 
 export async function POST(_req: NextRequest) {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const email = user.email ?? null;
 
@@ -49,7 +58,11 @@ export async function POST(_req: NextRequest) {
 
   if (!customerId) {
     // Nothing to restore, keep as-is
-    return NextResponse.json({ ok: true, plan: profile?.plan ?? "free", customerId: null });
+    return NextResponse.json({
+      ok: true,
+      plan: profile?.plan ?? "free",
+      customerId: null,
+    });
   }
 
   // Pull subscriptions (include inactive, we’ll filter)
@@ -63,17 +76,30 @@ export async function POST(_req: NextRequest) {
   let bestTier: string | null = null;
   let bestSubId: string | null = null;
 
+  const rank: Record<string, number> = {
+    free: 0,
+    ideas: 1,
+    conviction: 2,
+    macro: 3,
+    admin: 99,
+  };
+
   for (const sub of subs.data) {
     // Treat these as “has access”
-    const okStatus = ["trialing", "active", "past_due", "unpaid"].includes(sub.status);
+    const okStatus = ["trialing", "active", "past_due", "unpaid"].includes(
+      sub.status,
+    );
     if (!okStatus) continue;
 
     const priceId = (sub.items?.data?.[0]?.price as any)?.id ?? null;
     const tier = tierFromPriceId(priceId);
     if (!tier) continue;
 
-    bestTier = maxTier(bestTier, tier);
-    bestSubId = sub.id;
+    const currentBest = bestTier ?? "free";
+    if (rank[tier] > rank[currentBest]) {
+      bestTier = tier;
+      bestSubId = sub.id;
+    }
   }
 
   const finalPlan = bestTier ?? "free";
@@ -87,5 +113,10 @@ export async function POST(_req: NextRequest) {
     })
     .eq("id", user.id);
 
-  return NextResponse.json({ ok: true, plan: finalPlan, customerId, subscriptionId: bestSubId });
+  return NextResponse.json({
+    ok: true,
+    plan: finalPlan,
+    customerId,
+    subscriptionId: bestSubId,
+  });
 }

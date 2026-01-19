@@ -216,7 +216,9 @@ export default async function ConvictionTeaserPage(props: {
           <p className="mt-2 text-sm text-white/70 leading-relaxed">
             {wsjTeaser((row.body ?? teaser) as any, 620)}
           </p>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/95 to-transparent" />
+          {!allowed ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/95 to-transparent" />
+          ) : null}
 
           {allowed ? (
             <div className="mt-6">

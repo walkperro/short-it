@@ -1,4 +1,5 @@
 import ManageBillingButton from "@/components/billing/ManageBillingButton";
+import SyncBillingOnReturn from "@/components/billing/SyncBillingOnReturn";
 
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -8,14 +9,20 @@ import { planDisplay, normalizePlan } from "@/lib/entitlements";
 
 export const runtime = "nodejs";
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams?: { [key: string]: string | string[] | undefined };
+}) {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
   const user = data.user;
 
+  const shouldSync = searchParams?.sync === "1";
   if (!user) {
     return (
       <main className="mx-auto max-w-4xl px-6 py-10 text-white">
+        <SyncBillingOnReturn enabled={Boolean(shouldSync)} />
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-lg font-semibold">You’re not signed in.</div>
           <Link
@@ -44,6 +51,7 @@ export default async function AccountPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10 text-white">
+      <SyncBillingOnReturn enabled={Boolean(shouldSync)} />
       <h1 className="text-4xl font-semibold tracking-tight">Account</h1>
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -51,7 +59,9 @@ export default async function AccountPage() {
         <div className="mt-1 text-lg font-semibold">{user.email}</div>
 
         <div className="mt-4 text-sm text-white/60">Plan</div>
-        <div className="mt-1 text-lg font-semibold">{is_admin ? "Admin" : planDisplay(displayPlan)}</div>
+        <div className="mt-1 text-lg font-semibold">
+          {is_admin ? "Admin" : planDisplay(displayPlan)}
+        </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
           <ManageBillingButton />

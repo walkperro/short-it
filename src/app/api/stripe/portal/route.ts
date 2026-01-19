@@ -26,7 +26,10 @@ export async function POST(_req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: "Profile lookup failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Profile lookup failed" },
+      { status: 500 },
+    );
   }
 
   const siteUrl = getSiteUrl();
@@ -49,7 +52,7 @@ export async function POST(_req: NextRequest) {
 
   const portal = await stripe.billingPortal.sessions.create({
     customer: customerId,
-    return_url: `${siteUrl}/account`,
+    return_url: `${siteUrl}/account?sync=1`,
   });
 
   return NextResponse.json({ url: portal.url });
