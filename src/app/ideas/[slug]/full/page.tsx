@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import ReadFullConvictionCta from "@/components/ReadFullConvictionCta";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
@@ -129,6 +130,15 @@ export default async function IdeaFullPage({ params }: { params: Promise<{ slug:
   }
 
   const i = idea as any as IdeaRow;
+
+  const { data: conv } = await supabaseAdmin
+    .from("convictions")
+    .select("id")
+    .eq("status", "published")
+    .eq("idea_id", (idea as any).id)
+    .maybeSingle();
+
+  const hasConviction = Boolean(conv?.id);
   const when = i.published_at ?? i.created_at;
 
   return (
@@ -141,11 +151,7 @@ export default async function IdeaFullPage({ params }: { params: Promise<{ slug:
           </h1>
           <div className="mt-2 text-xs text-white/40">{new Date(when as any).toLocaleString()}</div>
         </div>
-
-        <Link href={`/ideas/${i.slug}`} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">
-          View teaser
-        </Link>
-      </div>
+</div>
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
         <div className="flex items-center justify-between">
@@ -179,6 +185,19 @@ export default async function IdeaFullPage({ params }: { params: Promise<{ slug:
           </div>
         ) : null}
       </div>
+      {hasConviction ? (
+        <ReadFullConvictionCta href={`/conviction/${i.slug}/full`} />
+      ) : null}
+
+      <div className="mt-6">
+        <Link
+          href="/ideas"
+          className="text-sm text-white/70 underline underline-offset-4 hover:text-white"
+        >
+          Back to Ideas
+        </Link>
+      </div>
+
     </main>
   );
 }

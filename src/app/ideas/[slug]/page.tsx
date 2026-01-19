@@ -62,8 +62,7 @@ async function getViewerPlan() {
       .maybeSingle();
 
     plan = normalizePlan(profile?.plan ?? "free");
-    isAdmin =
-      isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
+    isAdmin = isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
   }
 
   return { plan, isAdmin };
@@ -85,8 +84,8 @@ export async function generateMetadata(props: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await props.params;
-  
-const site = process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade";
+
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade";
   const teaserUrl = `${site}/ideas/${slug}`;
   const idea = await getIdeaBySlug(slug);
 
@@ -111,7 +110,14 @@ const site = process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade";
       title: titleBits.join(" "),
       description: desc,
       url: `/ideas/${slug}`,
-      images: [{ url: "/og.png", width: 1200, height: 630, alt: "SHORT-IT — Trade Intel" }],
+      images: [
+        {
+          url: "/og.png",
+          width: 1200,
+          height: 630,
+          alt: "SHORT-IT — Trade Intel",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
@@ -127,7 +133,10 @@ export default async function IdeaTeaserPage(props: {
 }) {
   const { slug } = await props.params;
 
-  const [viewer, idea] = await Promise.all([getViewerPlan(), getIdeaBySlug(slug)]);
+  const [viewer, idea] = await Promise.all([
+    getViewerPlan(),
+    getIdeaBySlug(slug),
+  ]);
   if (!idea) return notFound();
 
   const isFree = !viewer.isAdmin && viewer.plan === "free";
@@ -155,7 +164,9 @@ export default async function IdeaTeaserPage(props: {
 
       <div className="flex items-start justify-between gap-6">
         <div>
-          <div className="level-fade text-xs tracking-[0.35em] text-white/40">LEVEL I</div>
+          <div className="level-fade text-xs tracking-[0.35em] text-white/40">
+            LEVEL I
+          </div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             {idea.ticker ? idea.ticker.toUpperCase() : "Idea"}{" "}
             <span className="text-white/30">•</span>{" "}
@@ -188,15 +199,13 @@ export default async function IdeaTeaserPage(props: {
         <div className="grid grid-cols-2 gap-x-10 gap-y-3 text-sm">
           <div className="flex items-center justify-between">
             <div className="text-xs tracking-widest text-white/40">TICKER</div>
-            <div className="font-semibold">{idea.ticker?.toUpperCase() ?? "—"}</div>
+            <div className="font-semibold">
+              {idea.ticker?.toUpperCase() ?? "—"}
+            </div>
           </div>
           <div className="flex items-center justify-between">
             <div className="text-xs tracking-widest text-white/40">TYPE</div>
             <div className="text-white/80">{idea.kind ?? "—"}</div>
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="text-xs tracking-widest text-white/40">DIRECTION</div>
-            <div className="font-semibold">{upper(idea.direction ?? idea.option_side)}</div>
           </div>
           <div className="flex items-center justify-between">
             <div className="text-xs tracking-widest text-white/40">ENTRY</div>
@@ -206,15 +215,14 @@ export default async function IdeaTeaserPage(props: {
 
         <div className="mt-6">
           <div className="text-xs tracking-widest text-white/40">PREVIEW</div>
-          <p className="mt-2 text-sm text-white/70 leading-relaxed">
-            {teaser}
-          </p>
+          <p className="mt-2 text-sm text-white/70 leading-relaxed">{teaser}</p>
         </div>
 
         {isLockedForViewer ? (
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="text-sm text-white/80">
-              This idea is locked. Subscribe to unlock the full breakdown + updates.
+              This idea is locked. Subscribe to unlock the full breakdown +
+              updates.
             </div>
             <div className="mt-4 flex gap-3">
               <Link
@@ -232,6 +240,24 @@ export default async function IdeaTeaserPage(props: {
             </div>
           </div>
         ) : null}
+      </div>
+
+      <div className="mt-6 flex justify-center">
+        {isLockedForViewer ? (
+          <Link
+            href="/subscribe"
+            className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white/90 hover:bg-white/10 hover:border-white/25 transition"
+          >
+            Click to see full details
+          </Link>
+        ) : (
+          <Link
+            href={`/ideas/${idea.slug}/full`}
+            className="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white/90 hover:bg-white/10 hover:border-white/25 transition"
+          >
+            Click to see full details
+          </Link>
+        )}
       </div>
     </main>
   );

@@ -130,16 +130,21 @@ export default async function ConvictionFullPage({ params }: { params: Promise<{
 
         <div className="flex items-center gap-3">
           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${b.cls}`}>{b.up}</span>
-          <Link href={`/conviction/${slug}`} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">
-            View teaser
-          </Link>
-        </div>
+</div>
       </div>
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
-        <div className="text-xs tracking-widest text-white/50">WRITE-UP</div>
         <p className="mt-3 text-sm text-white/75 whitespace-pre-wrap">{(data as any).body || "—"}</p>
       </div>
-    </main>
+    
+      <div className="mt-6">
+        <Link
+          href="/conviction"
+          className="text-sm text-white/70 underline underline-offset-4 hover:text-white"
+        >
+          Back to Convictions
+        </Link>
+      </div>
+</main>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import ReadFullConvictionCta from "@/components/ReadFullConvictionCta";
 import { notFound } from "next/navigation";
 
 import {
@@ -41,6 +42,20 @@ function pad3(n?: number | null) {
   return String(n).padStart(3, "0");
 }
 
+function wsjTeaser(text: string, maxChars = 620) {
+  const t = (text ?? "").trim();
+  if (!t) return "";
+  // Prefer ending at a paragraph break if possible
+  if (t.length <= maxChars) return t;
+  const slice = t.slice(0, maxChars);
+  const lastBreak = Math.max(
+    slice.lastIndexOf("\n\n"),
+    slice.lastIndexOf("\n"),
+  );
+  const cutAt = lastBreak > 200 ? lastBreak : maxChars;
+  return t.slice(0, cutAt).trimEnd() + "…";
+}
+
 async function getViewerAccess() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -58,8 +73,7 @@ async function getViewerAccess() {
       .maybeSingle();
 
     plan = normalizePlan(profile?.plan ?? "free") as Plan;
-    isAdmin =
-      isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
+    isAdmin = isAdminEmail(user.email ?? null) || Boolean(profile?.is_admin);
   }
 
   const allowed = isAdmin || canAccess(plan, "conviction");
@@ -86,13 +100,14 @@ export async function generateMetadata(props: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await props.params;
-  
-const site = process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade";
+
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade";
   const teaserUrl = `${site}/conviction/${slug}`;
 
   // metadata should be indexable; teaser content is safe for crawlers
   const row = await getConvictionByIdeaSlug(slug, false);
-  if (!row?.ideas) return { title: "Conviction", robots: { index: false, follow: false } };
+  if (!row?.ideas)
+    return { title: "Conviction", robots: { index: false, follow: false } };
 
   const t = row.ideas.ticker ? row.ideas.ticker.toUpperCase() : "Conviction";
   const k = row.ideas.kind ? `• ${row.ideas.kind}` : "";
@@ -112,7 +127,14 @@ const site = process.env.NEXT_PUBLIC_SITE_URL || "https://short-it.trade";
       title,
       description: desc,
       url: `/conviction/${slug}`,
-      images: [{ url: "/og.png", width: 1200, height: 630, alt: "SHORT-IT — Trade Intel" }],
+      images: [
+        {
+          url: "/og.png",
+          width: 1200,
+          height: 630,
+          alt: "SHORT-IT — Trade Intel",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
@@ -129,7 +151,7 @@ export default async function ConvictionTeaserPage(props: {
   const { slug } = await props.params;
 
   const { allowed } = await getViewerAccess();
-  const row = await getConvictionByIdeaSlug(slug, allowed);
+  const row = await getConvictionByIdeaSlug(slug, true);
   if (!row?.ideas) return notFound();
 
   const idea = row.ideas;
@@ -158,7 +180,9 @@ export default async function ConvictionTeaserPage(props: {
 
       <div className="flex items-start justify-between gap-6">
         <div>
-          <div className="level-fade text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
+          <div className="level-fade text-xs tracking-[0.35em] text-white/40">
+            LEVEL II
+          </div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             {idea.ticker ? idea.ticker.toUpperCase() : "Conviction"}{" "}
             <span className="text-white/30">•</span>{" "}
@@ -188,15 +212,24 @@ export default async function ConvictionTeaserPage(props: {
       </div>
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
-        <div className="text-xs tracking-widest text-white/40">PREVIEW</div>
-        <p className="mt-2 text-sm text-white/70 leading-relaxed">
-          {teaser}
-        </p>
+        <div className="relative">
+          <p className="mt-2 text-sm text-white/70 leading-relaxed">
+            {wsjTeaser((row.body ?? teaser) as any, 620)}
+          </p>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/95 to-transparent" />
+
+          {allowed ? (
+            <div className="mt-6">
+              <ReadFullConvictionCta href={`/conviction/${slug}/full`} />
+            </div>
+          ) : null}
+        </div>
 
         {!allowed ? (
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="text-sm text-white/80">
-              Conviction is a premium unlock. Subscribe to see the full write-up + ongoing updates.
+              Conviction is a premium unlock. Subscribe to see the full write-up
+              + ongoing updates.
             </div>
             <div className="mt-4 flex gap-3">
               <Link
@@ -213,14 +246,7 @@ export default async function ConvictionTeaserPage(props: {
               </Link>
             </div>
           </div>
-        ) : (
-          <div className="mt-6">
-            <div className="text-xs tracking-widest text-white/40">FULL</div>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-white/80 leading-relaxed">
-              {row.body ?? "—"}
-            </p>
-          </div>
-        )}
+        ) : null}
       </div>
     </main>
   );
