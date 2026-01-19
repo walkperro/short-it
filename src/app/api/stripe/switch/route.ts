@@ -4,7 +4,6 @@ import {
   createSupabaseServerClient,
   supabaseAdmin,
 } from "@/lib/supabase/server";
-import { getRequestBaseUrl } from "@/lib/server-url";
 
 export const runtime = "nodejs";
 
@@ -14,8 +13,12 @@ const PRICE_BY_TIER: Record<string, string | undefined> = {
   macro: process.env.STRIPE_PRICE_MACRO,
 };
 
+function tierRank(t: string) {
+  return t === "ideas" ? 1 : t === "conviction" ? 2 : t === "macro" ? 3 : 0;
+}
+
 export async function POST(req: NextRequest) {
-  const { tier } = await req.json().catch(() => ({}) as any);
+  const { tier } = (await req.json().catch(() => ({}))) as any;
 
   if (!tier || !PRICE_BY_TIER[tier]) {
     return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
@@ -43,7 +46,6 @@ export async function POST(req: NextRequest) {
   }
 
   const activeVersion = (activeAgreement as any)?.version ?? null;
-
   if (!activeVersion) {
     return NextResponse.json(
       { error: "No active agreement set" },
@@ -75,12 +77,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Pull email + stripe_customer_id from profiles
+  // Load customer + current subscription from profiles
   const { data: profile, error: profErr } = await supabaseAdmin
     .from("profiles")
-    .select("email,stripe_customer_id")
+    .select("stripe_customer_id,stripe_subscription_id,plan")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (profErr) {
     return NextResponse.json(
@@ -89,63 +91,69 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const receiptEmail = (profile as any)?.email ?? user.email ?? undefined;
-  let customerId = (profile as any)?.stripe_customer_id ?? null;
-
-  // Ensure Stripe customer exists
+  const customerId = (profile as any)?.stripe_customer_id ?? null;
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: receiptEmail,
-      metadata: { userId: user.id },
-    });
-
-    customerId = customer.id;
-
-    await supabaseAdmin
-      .from("profiles")
-      .update({ stripe_customer_id: customerId })
-      .eq("id", user.id);
-  } else {
-    // keep email updated for receipts
-    if (receiptEmail) {
-      await stripe.customers.update(customerId, { email: receiptEmail });
-    }
+    return NextResponse.json(
+      { error: "No Stripe customer on file. Start subscription first." },
+      { status: 400 },
+    );
   }
 
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || (await getRequestBaseUrl());
-
-  // If an active subscription exists, client should use /api/stripe/switch instead.
+  // Find the active-ish subscription
   const subs = await stripe.subscriptions.list({
     customer: customerId,
     status: "all",
     limit: 10,
+    expand: ["data.items.data.price"],
   });
 
-  const hasActive = subs.data.some((sub) =>
-    ["active", "trialing", "past_due", "unpaid"].includes(sub.status),
+  const sub = subs.data.find((s) =>
+    ["active", "trialing", "past_due", "unpaid"].includes(s.status),
   );
 
-  if (hasActive) {
+  if (!sub) {
     return NextResponse.json(
-      { error: "Subscription already exists", code: "SUBSCRIPTION_EXISTS" },
-      { status: 409 },
+      { error: "No active subscription found." },
+      { status: 400 },
     );
   }
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    allow_promotion_codes: true,
-    consent_collection: { terms_of_service: "required" },
-    payment_method_collection: "if_required",
-    customer: customerId,
-    line_items: [{ price: PRICE_BY_TIER[tier]!, quantity: 1 }],
-    subscription_data: {
-      metadata: { userId: user.id, tier },
-    },
+
+  const item = sub.items?.data?.[0];
+  const itemId = item?.id;
+  const currentPriceId = (item?.price as any)?.id ?? null;
+
+  if (!itemId) {
+    return NextResponse.json(
+      { error: "Subscription item not found." },
+      { status: 500 },
+    );
+  }
+
+  const newPriceId = PRICE_BY_TIER[tier]!;
+  if (currentPriceId === newPriceId) {
+    return NextResponse.json({ ok: true, note: "Already on this tier." });
+  }
+
+  // Decide proration behavior (upgrade now, downgrade next renewal)
+  const currentTier = (profile as any)?.plan ?? "free";
+  const upgrading = tierRank(tier) > tierRank(currentTier);
+
+  const updated = await stripe.subscriptions.update(sub.id, {
+    items: [{ id: itemId, price: newPriceId }],
+    proration_behavior: upgrading ? "create_prorations" : "none",
+    // keep billing cycle anchor (don’t reset date)
+    billing_cycle_anchor: "unchanged",
     metadata: { userId: user.id, tier },
-    success_url: `${siteUrl}/account?success=1`,
-    cancel_url: `${siteUrl}/subscribe?canceled=1`,
   });
 
-  return NextResponse.json({ url: session.url });
+  // Store latest sub id; plan will be finalized via webhook/sync
+  await supabaseAdmin
+    .from("profiles")
+    .update({
+      stripe_subscription_id: updated.id,
+      plan: tier, // optimistic; sync/webhook will confirm
+    })
+    .eq("id", user.id);
+
+  return NextResponse.json({ ok: true, subscriptionId: updated.id, tier });
 }

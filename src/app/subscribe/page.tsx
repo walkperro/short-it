@@ -139,6 +139,40 @@ export default function SubscribePage() {
 
   const currentRank = rankOf(plan);
 
+  async function goTier(nextTier: Exclude<Tier, "free" | "admin">) {
+    setErr(null);
+    try {
+      // New customers: use agreement screen + checkout
+      if (plan === "free") {
+        window.location.href = `/subscribe/agree?tier=${encodeURIComponent(nextTier)}`;
+        return;
+      }
+
+      // Existing customers: switch in-app (single subscription)
+      const res = await fetch("/api/stripe/switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier: nextTier }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (json?.code === "AGREEMENT_REQUIRED") {
+          window.location.href = `/subscribe/agree?tier=${encodeURIComponent(nextTier)}`;
+          return;
+        }
+        throw new Error(json?.error ?? "Switch failed");
+      }
+
+      // refresh plan UI
+      await syncPlan();
+      const m = await fetch("/api/me/plan", { cache: "no-store" });
+      const mj = await m.json().catch(() => ({}));
+      if (mj?.plan) setPlan(mj.plan);
+    } catch (e: any) {
+      setErr(e?.message ?? "Switch failed");
+    }
+  }
+
   function isIncluded(tier: Exclude<Tier, "free" | "admin">) {
     return TIER_META[tier].rank <= currentRank;
   }
@@ -277,7 +311,7 @@ export default function SubscribePage() {
           included={isIncluded("ideas")}
           locked={isLockedTier("ideas")}
           disabled={loading || !agreed}
-          onClick={() => (window.location.href = "/subscribe/agree?tier=ideas")}
+          onClick={() => goTier("ideas")}
         />
 
         <TierCard
@@ -288,9 +322,7 @@ export default function SubscribePage() {
           included={isIncluded("conviction")}
           locked={isLockedTier("conviction")}
           disabled={loading || !agreed}
-          onClick={() =>
-            (window.location.href = "/subscribe/agree?tier=conviction")
-          }
+          onClick={() => goTier("conviction")}
         />
 
         <TierCard
@@ -301,7 +333,7 @@ export default function SubscribePage() {
           included={isIncluded("macro")}
           locked={isLockedTier("macro")}
           disabled={loading || !agreed}
-          onClick={() => (window.location.href = "/subscribe/agree?tier=macro")}
+          onClick={() => goTier("macro")}
         />
       </div>
     </main>
