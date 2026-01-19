@@ -1,4 +1,5 @@
 import ManageBillingButton from "@/components/billing/ManageBillingButton";
+import SwitchPlanButton from "@/components/billing/SwitchPlanButton";
 import SyncBillingOnReturn from "@/components/billing/SyncBillingOnReturn";
 
 import Link from "next/link";
@@ -65,6 +66,10 @@ export default async function AccountPage({
 
         <div className="mt-6 flex flex-wrap gap-3">
           <ManageBillingButton />
+          <SwitchPlanButton
+            currentPlan={displayPlan as any}
+            isAdmin={is_admin}
+          />
 
           <Link
             href="/subscribe"

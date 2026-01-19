@@ -11,6 +11,9 @@ const PRICE_BY_TIER: Record<string, string | undefined> = {
   macro: process.env.STRIPE_PRICE_MACRO,
 };
 
+type Tier = "ideas" | "conviction" | "macro";
+type DowngradeTiming = "renewal" | "now";
+
 function tierRank(tier: string | null | undefined) {
   if (tier === "ideas") return 1;
   if (tier === "conviction") return 2;
@@ -26,8 +29,32 @@ function tierFromPriceId(priceId: string | null | undefined) {
   return null;
 }
 
+// Force Stripe to generate + pay proration invoice (triggers receipt email)
+async function invoiceNowForProration(subscriptionId: string) {
+  const inv = await stripe.invoices.create({
+    subscription: subscriptionId,
+    pending_invoice_items_behavior: "include",
+    auto_advance: true,
+  });
+
+  const finalized = await stripe.invoices.finalizeInvoice(inv.id);
+
+  if (
+    finalized.status === "paid" ||
+    finalized.status === "void" ||
+    finalized.status === "uncollectible"
+  ) {
+    return finalized;
+  }
+
+  return await stripe.invoices.pay(finalized.id);
+}
+
 export async function POST(req: NextRequest) {
-  const { tier } = await req.json().catch(() => ({}) as any);
+  const body = await req.json().catch(() => ({}) as any);
+  const tier = body?.tier as Tier | undefined;
+  const downgrade_timing: DowngradeTiming =
+    body?.downgrade_timing === "now" ? "now" : "renewal";
 
   if (!tier || !PRICE_BY_TIER[tier]) {
     return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
@@ -42,14 +69,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  // Load profile (customer + cached subscription id if present)
-  const { data: profile, error: profErr } = await supabaseAdmin
+  const { data: profile, error } = await supabaseAdmin
     .from("profiles")
     .select("id,email,stripe_customer_id,stripe_subscription_id,plan")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profErr) {
+  if (error) {
     return NextResponse.json(
       { error: "Profile lookup failed" },
       { status: 500 },
@@ -59,7 +85,6 @@ export async function POST(req: NextRequest) {
   let customerId = profile?.stripe_customer_id ?? null;
   const receiptEmail = profile?.email ?? user.email ?? undefined;
 
-  // Ensure customer exists
   if (!customerId) {
     const customer = await stripe.customers.create({
       email: receiptEmail,
@@ -71,13 +96,10 @@ export async function POST(req: NextRequest) {
       .from("profiles")
       .update({ stripe_customer_id: customerId })
       .eq("id", user.id);
-  } else {
-    if (receiptEmail) {
-      await stripe.customers.update(customerId, { email: receiptEmail });
-    }
+  } else if (receiptEmail) {
+    await stripe.customers.update(customerId, { email: receiptEmail });
   }
 
-  // Find active-ish subscription
   const subs = await stripe.subscriptions.list({
     customer: customerId,
     status: "all",
@@ -85,25 +107,24 @@ export async function POST(req: NextRequest) {
     expand: ["data.items.data.price"],
   });
 
-  const activeLike = subs.data.find((s) =>
+  const sub = subs.data.find((s) =>
     ["trialing", "active", "past_due", "unpaid"].includes(s.status),
   );
 
-  if (!activeLike) {
+  if (!sub) {
     return NextResponse.json(
-      { error: "No active subscription found to switch." },
+      { error: "No active subscription found." },
       { status: 400 },
     );
   }
 
-  const sub = activeLike;
   const item = sub.items?.data?.[0];
-  const itemId = item?.id ?? null;
-  const currentPriceId = (item?.price as any)?.id ?? null;
+  const itemId = item?.id;
+  const currentPriceId = (item?.price as any)?.id;
 
   if (!itemId || !currentPriceId) {
     return NextResponse.json(
-      { error: "Could not determine current subscription item/price." },
+      { error: "Unable to determine current subscription item." },
       { status: 500 },
     );
   }
@@ -111,26 +132,13 @@ export async function POST(req: NextRequest) {
   const currentTier = tierFromPriceId(currentPriceId);
   const newPriceId = PRICE_BY_TIER[tier]!;
   const upgrading = tierRank(tier) > tierRank(currentTier);
+  const downgrading = tierRank(tier) < tierRank(currentTier);
 
-  // If already on that price, no-op (still sync profile)
   if (currentPriceId === newPriceId) {
-    await supabaseAdmin
-      .from("profiles")
-      .update({
-        stripe_subscription_id: sub.id,
-        plan: tier,
-      })
-      .eq("id", user.id);
-
-    return NextResponse.json({
-      ok: true,
-      mode: "no_change",
-      tier,
-      subscriptionId: sub.id,
-    });
+    return NextResponse.json({ ok: true, mode: "no_change", tier });
   }
 
-  // ✅ Upgrades: apply immediately with proration (charge/credit now)
+  // 🔼 Upgrade immediately + send receipt
   if (upgrading) {
     const updated = await stripe.subscriptions.update(sub.id, {
       items: [{ id: itemId, price: newPriceId }],
@@ -139,78 +147,80 @@ export async function POST(req: NextRequest) {
       metadata: { userId: user.id, tier },
     });
 
+    let invoice = null;
+    try {
+      invoice = await invoiceNowForProration(updated.id);
+    } catch (e: any) {
+      invoice = { error: e?.message };
+    }
+
     await supabaseAdmin
       .from("profiles")
-      .update({
-        stripe_subscription_id: updated.id,
-        plan: tier,
-      })
+      .update({ plan: tier, stripe_subscription_id: updated.id })
       .eq("id", user.id);
 
     return NextResponse.json({
       ok: true,
       mode: "upgrade_now",
       tier,
-      subscriptionId: updated.id,
+      invoice,
     });
   }
 
-  // ✅ Downgrades: schedule at period end (keep access until renewal)
+  // 🔽 Downgrade immediately (manual)
+  if (downgrading && downgrade_timing === "now") {
+    const updated = await stripe.subscriptions.update(sub.id, {
+      items: [{ id: itemId, price: newPriceId }],
+      proration_behavior: "none",
+      billing_cycle_anchor: "unchanged",
+      metadata: { userId: user.id, tier },
+    });
+
+    await supabaseAdmin
+      .from("profiles")
+      .update({ plan: tier, stripe_subscription_id: updated.id })
+      .eq("id", user.id);
+
+    return NextResponse.json({
+      ok: true,
+      mode: "downgrade_now",
+      tier,
+    });
+  }
+
+  // 🔽 Downgrade at renewal (default)
   const schedule = await stripe.subscriptionSchedules.create({
     from_subscription: sub.id,
   });
 
   const phase0 = schedule.phases?.[0];
-  const start = phase0?.start_date ?? null;
-  const end = phase0?.end_date ?? null;
-
-  if (!start || !end) {
+  if (!phase0?.start_date || !phase0?.end_date) {
     return NextResponse.json(
-      {
-        error:
-          "Could not determine current period end for downgrade scheduling.",
-      },
+      { error: "Unable to schedule downgrade." },
       { status: 500 },
     );
   }
 
-  const updatedSchedule = await stripe.subscriptionSchedules.update(
-    schedule.id,
-    {
-      end_behavior: "release",
-      phases: [
-        // Keep current plan until period end
-        {
-          start_date: start,
-          end_date: end,
-          items: (phase0?.items as any) ?? [
-            { price: currentPriceId, quantity: 1 },
-          ],
-        },
-        // Switch to cheaper plan at renewal
-        {
-          start_date: end,
-          items: [{ price: newPriceId, quantity: 1 }],
-        },
-      ],
-      metadata: { userId: user.id, tier },
-    },
-  );
-
-  // Keep plan unchanged for now; your webhook/sync will flip it after renewal.
-  await supabaseAdmin
-    .from("profiles")
-    .update({
-      stripe_subscription_id: sub.id,
-    })
-    .eq("id", user.id);
+  await stripe.subscriptionSchedules.update(schedule.id, {
+    end_behavior: "release",
+    phases: [
+      {
+        start_date: phase0.start_date,
+        end_date: phase0.end_date,
+        items: phase0.items as any,
+      },
+      {
+        start_date: phase0.end_date,
+        items: [{ price: newPriceId, quantity: 1 }],
+      },
+    ],
+    metadata: { userId: user.id, tier },
+  });
 
   return NextResponse.json({
     ok: true,
     mode: "downgrade_at_renewal",
     tier,
-    subscriptionId: sub.id,
-    scheduleId: updatedSchedule.id,
-    effective_at: end,
+    effective_at: phase0.end_date,
   });
 }

@@ -15,6 +15,14 @@ export default function AgreePage() {
   const [c2, setC2] = useState(false);
   const [c3, setC3] = useState(false);
 
+  // Password confirm state
+  const [pw, setPw] = useState("");
+  const [pwOk, setPwOk] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwErr, setPwErr] = useState<string | null>(null);
+
+  const [submitting, setSubmitting] = useState(false);
+
   const showRefund = useMemo(() => {
     const b = String(agreement?.body ?? "").toLowerCase();
     return (
@@ -49,12 +57,41 @@ export default function AgreePage() {
     })();
   }, []);
 
-  async function acceptAndCheckout() {
+  async function confirmPassword() {
+    setPwErr(null);
+    setPwOk(false);
+    setPwLoading(true);
     try {
-      setErr(null);
+      const res = await fetch("/api/auth/confirm-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Incorrect password");
+      setPwOk(true);
+    } catch (e: any) {
+      setPwOk(false);
+      setPwErr(e?.message ?? "Incorrect password");
+    } finally {
+      setPwLoading(false);
+    }
+  }
 
+  async function acceptAndCheckout() {
+    setErr(null);
+
+    try {
       if (!agreement?.version) throw new Error("Missing agreement version");
+      if (!allChecked) throw new Error("Please check all required boxes.");
+      if (!pwOk) {
+        setPwErr("Please confirm your password to continue.");
+        return;
+      }
 
+      setSubmitting(true);
+
+      // record acceptance
       const a = await fetch("/api/agreements/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -70,6 +107,7 @@ export default function AgreePage() {
         // ignore
       }
 
+      // proceed to checkout (or portal redirect / switch)
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,6 +118,8 @@ export default function AgreePage() {
       if (json?.url) window.location.href = json.url;
     } catch (e: any) {
       setErr(e?.message ?? "Failed");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -94,7 +134,7 @@ export default function AgreePage() {
             Before you purchase
           </h1>
           <p className="mt-2 text-sm text-white/60">
-            You must accept the terms to continue to checkout.
+            You must accept the terms and confirm your password to continue.
           </p>
         </div>
 
@@ -169,18 +209,59 @@ export default function AgreePage() {
               ) : null}
             </div>
 
+            {/* Password confirm block */}
+            <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="text-xs tracking-widest text-white/50">
+                CONFIRM WITH PASSWORD
+              </div>
+              <p className="mt-2 text-xs text-white/55">
+                Type your account password to confirm this purchase/plan change.
+              </p>
+
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="password"
+                  value={pw}
+                  onChange={(e) => {
+                    setPw(e.target.value);
+                    setPwOk(false);
+                    setPwErr(null);
+                  }}
+                  placeholder="Password"
+                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/85 placeholder:text-white/35 outline-none focus:border-white/20"
+                />
+                <button
+                  type="button"
+                  onClick={confirmPassword}
+                  disabled={!pw || pwLoading || submitting || loading}
+                  className={[
+                    "shrink-0 rounded-2xl px-3 py-2 text-sm font-semibold transition",
+                    !pw || pwLoading || submitting || loading
+                      ? "border border-white/10 bg-white/5 text-white/50"
+                      : "bg-white text-black hover:opacity-95",
+                  ].join(" ")}
+                >
+                  {pwLoading ? "Checking…" : pwOk ? "Confirmed ✓" : "Confirm"}
+                </button>
+              </div>
+
+              {pwErr ? (
+                <div className="mt-3 text-xs text-red-200">{pwErr}</div>
+              ) : null}
+            </div>
+
             <button
-              disabled={!allChecked || loading}
+              disabled={!allChecked || !pwOk || loading || submitting}
               onClick={acceptAndCheckout}
               className={[
                 "mt-6 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                allChecked
+                allChecked && pwOk
                   ? "bg-white text-black hover:opacity-95"
                   : "border border-white/10 bg-white/5 text-white/50",
                 "disabled:opacity-60",
               ].join(" ")}
             >
-              Continue to checkout
+              {submitting ? "Processing…" : "Continue to checkout"}
             </button>
 
             <div className="mt-3 text-xs text-white/40">
