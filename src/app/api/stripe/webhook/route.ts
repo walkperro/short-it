@@ -10,6 +10,52 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
 });
 
+function tierValueUSD(tier: string | null) {
+  if (tier === "ideas") return 29.99;
+  if (tier === "conviction") return 79.99;
+  if (tier === "macro") return 199.99;
+  return undefined;
+}
+
+async function getCustomerUserId(customerId: string) {
+  try {
+    const c = await stripe.customers.retrieve(customerId);
+    if ("deleted" in c) return null;
+    const v = (c.metadata as any)?.userId ?? null;
+    return typeof v === "string" && v.length ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getCustomerGaClientId(customerId: string) {
+  try {
+    const c = await stripe.customers.retrieve(customerId);
+    if ("deleted" in c) return null;
+    const v = (c.metadata as any)?.ga_client_id ?? null;
+    return typeof v === "string" && v.length ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+async function pickGaClientId(input: {
+  session?: Stripe.Checkout.Session | null;
+  sub?: Stripe.Subscription | null;
+  customerId?: string | null;
+}) {
+  const fromSession = (input.session?.metadata as any)?.ga_client_id ?? null;
+  if (typeof fromSession === "string" && fromSession.length) return fromSession;
+
+  const fromSub = (input.sub?.metadata as any)?.ga_client_id ?? null;
+  if (typeof fromSub === "string" && fromSub.length) return fromSub;
+
+  const cid = input.customerId ?? null;
+  if (cid) return await getCustomerGaClientId(cid);
+
+  return null;
+}
+
 function tierFromPriceId(priceId?: string | null) {
   if (!priceId) return null;
   if (priceId === process.env.STRIPE_PRICE_IDEAS) return "ideas";
@@ -71,6 +117,9 @@ export async function POST(req: Request) {
 
       const customerId = session.customer?.toString() ?? null;
 
+      const userIdForGA =
+        (session.metadata?.userId as string) ||
+        (customerId ? await getCustomerUserId(customerId) : null);
       await supabaseAdmin
         .from("profiles")
         .update({
@@ -101,18 +150,23 @@ export async function POST(req: Request) {
       }
 
       // ✅ GA event (non-blocking)
-      if (customerId) {
-        await sendGAEvent({
-          clientId: customerId,
-          name: "subscription_created",
-          params: {
-            tier,
-            plan_label: planLabel(tier),
-            event_source: "checkout.session.completed",
-          },
-        });
-      }
-
+      try {
+        const ga_client_id = await pickGaClientId({ session, customerId });
+        if (ga_client_id) {
+          await sendGAEvent({
+            clientId: ga_client_id,
+            userId: userIdForGA,
+            name: "checkout_completed",
+            params: {
+              tier,
+              plan_label: planLabel(tier),
+              event_source: "checkout.session.completed",
+              value: tierValueUSD(tier),
+              currency: "USD",
+            },
+          });
+        }
+      } catch {}
       return NextResponse.json({ received: true });
     }
 
@@ -144,23 +198,30 @@ export async function POST(req: Request) {
 
       // ✅ GA events (non-blocking)
       try {
-        if (customerId) {
+        const ga_client_id = await pickGaClientId({ sub, customerId });
+        if (ga_client_id) {
           if (event.type === "customer.subscription.created") {
             await sendGAEvent({
-              clientId: customerId,
+              clientId: ga_client_id,
+              userId: customerId ? await getCustomerUserId(customerId) : null,
               name: "subscription_created",
               params: {
                 tier: tier ?? "unknown",
                 event_source: "customer.subscription.created",
+                value: tierValueUSD(tier ?? null),
+                currency: "USD",
               },
             });
           }
 
           if (event.type === "customer.subscription.deleted") {
             await sendGAEvent({
-              clientId: customerId,
+              clientId: ga_client_id,
+              userId: customerId ? await getCustomerUserId(customerId) : null,
               name: "subscription_canceled",
-              params: { event_source: "customer.subscription.deleted" },
+              params: {
+                event_source: "customer.subscription.deleted",
+              },
             });
           }
 
@@ -179,7 +240,8 @@ export async function POST(req: Request) {
             if (prevTier && newTier && prevTier !== newTier) {
               const upgrading = tierRank(newTier) > tierRank(prevTier);
               await sendGAEvent({
-                clientId: customerId,
+                clientId: ga_client_id,
+                userId: customerId ? await getCustomerUserId(customerId) : null,
                 name: upgrading
                   ? "subscription_upgraded"
                   : "subscription_downgraded",
@@ -188,12 +250,17 @@ export async function POST(req: Request) {
                   to_tier: newTier,
                   subscription_id: sub.id,
                   event_source: "customer.subscription.updated",
+                  from_value: tierValueUSD(prevTier),
+                  to_value: tierValueUSD(newTier),
+                  value: tierValueUSD(newTier),
+                  currency: "USD",
                 },
               });
             } else {
               // Generic update (status changes, etc.)
               await sendGAEvent({
-                clientId: customerId,
+                clientId: ga_client_id,
+                userId: customerId ? await getCustomerUserId(customerId) : null,
                 name: "subscription_updated",
                 params: {
                   tier: newTier ?? "unknown",
@@ -220,12 +287,13 @@ export async function POST(req: Request) {
       const subId =
         ((invoice as any).subscription ?? null)?.toString?.() ?? null;
 
+      let subForGA: any = null;
       let priceId: string | null = null;
       if (subId) {
-        const sub = await stripe.subscriptions.retrieve(subId, {
+        subForGA = await stripe.subscriptions.retrieve(subId, {
           expand: ["items.data.price"],
         });
-        priceId = (sub.items.data[0]?.price as any)?.id ?? null;
+        priceId = (subForGA?.items?.data?.[0]?.price as any)?.id ?? null;
       }
 
       const tier = tierFromPriceId(priceId);
@@ -238,21 +306,31 @@ export async function POST(req: Request) {
       }
 
       // ✅ GA renewal/revenue signal
-      if (customerId) {
-        await sendGAEvent({
-          clientId: customerId,
-          name: "invoice_paid",
-          params: {
-            tier: tier ?? "unknown",
-            subscription_id: subId ?? undefined,
-            invoice_id: invoice.id,
-            amount_paid: (invoice.amount_paid ?? 0) / 100,
-            currency: invoice.currency ?? undefined,
-            event_source: "invoice.payment_succeeded",
-          },
+      try {
+        const ga_client_id = await pickGaClientId({
+          sub: subForGA,
+          customerId,
         });
-      }
 
+        if (ga_client_id) {
+          await sendGAEvent({
+            clientId: ga_client_id,
+            userId: customerId ? await getCustomerUserId(customerId) : null,
+            name: "invoice_paid",
+            params: {
+              tier: tier ?? "unknown",
+              subscription_id: subId ?? undefined,
+              invoice_id: invoice.id,
+              amount_paid: (invoice.amount_paid ?? 0) / 100,
+              event_source: "invoice.payment_succeeded",
+              value: (invoice.amount_paid ?? 0) / 100,
+              currency: String(invoice.currency ?? "usd").toUpperCase(),
+            },
+          });
+        }
+      } catch {
+        // swallow
+      }
       return NextResponse.json({ received: true });
     }
 

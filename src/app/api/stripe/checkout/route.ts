@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
   if (!customerId) {
     const customer = await stripe.customers.create({
       email: receiptEmail,
-      metadata: { userId: user.id },
+      metadata: { userId: user.id, ...(ga_client_id ? { ga_client_id } : {}) },
     });
 
     customerId = customer.id;
@@ -108,7 +108,12 @@ export async function POST(req: NextRequest) {
   } else {
     // keep email updated for receipts
     if (receiptEmail) {
-      await stripe.customers.update(customerId, { email: receiptEmail });
+      await stripe.customers.update(customerId, {
+        email: receiptEmail,
+        ...(ga_client_id
+          ? { metadata: { ga_client_id: String(ga_client_id) } }
+          : {}),
+      });
     }
   }
 

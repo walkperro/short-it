@@ -102,7 +102,10 @@ export async function POST(req: NextRequest) {
       .update({ stripe_customer_id: customerId })
       .eq("id", user.id);
   } else if (receiptEmail) {
-    await stripe.customers.update(customerId, { email: receiptEmail });
+    await stripe.customers.update(customerId, {
+      email: receiptEmail,
+      ...(ga_client_id ? { metadata: { ga_client_id } } : {}),
+    });
   }
 
   const subs = await stripe.subscriptions.list({

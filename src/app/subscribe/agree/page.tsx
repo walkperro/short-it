@@ -3,6 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
+function getGaClientId() {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(/(?:^|;\s*)_ga=([^;]+)/);
+  if (!m) return null;
+  const v = decodeURIComponent(m[1] || "");
+  const parts = v.split(".");
+  if (parts.length >= 4)
+    return `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
+  return v || null;
+}
+
 type Tier = "ideas" | "conviction" | "macro";
 
 export default function AgreePage() {
@@ -110,25 +121,27 @@ export default function AgreePage() {
       // proceed to checkout (or portal redirect / switch)
 
       // Grab GA client_id (best-effort)
-      let ga_client_id: string | null = null;
-      try {
-        const w: any = typeof window !== "undefined" ? (window as any) : null;
-        const gaId = process.env.NEXT_PUBLIC_GA_ID;
-        if (w && typeof w.gtag === "function" && gaId) {
-          await new Promise<void>((resolve) => {
-            try {
-              w.gtag("get", gaId, "client_id", (cid: any) => {
-                ga_client_id = cid ? String(cid) : null;
+      let ga_client_id: string | null = getGaClientId();
+
+      // Optional fallback: ask gtag directly (won't block longer than 250ms)
+      if (!ga_client_id) {
+        try {
+          const w: any = typeof window !== "undefined" ? (window as any) : null;
+          if (w && typeof w.gtag === "function") {
+            await new Promise<void>((resolve) => {
+              try {
+                w.gtag("get", "G-XXXXXXXXXX", "client_id", (cid: any) => {
+                  ga_client_id = cid ? String(cid) : null;
+                  resolve();
+                });
+              } catch {
                 resolve();
-              });
-            } catch {
-              resolve();
-            }
-            // safety timeout so we never hang the checkout
-            setTimeout(resolve, 250);
-          });
-        }
-      } catch {}
+              }
+              setTimeout(resolve, 250);
+            });
+          }
+        } catch {}
+      }
 
       // proceed to checkout (or portal redirect / switch)
       // GA intent event: start checkout (confirmed + agreements accepted)

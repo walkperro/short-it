@@ -1,4 +1,8 @@
-export async function sendGAEvent({
+import fs from "node:fs";
+
+const file = "src/lib/analytics/ga.ts";
+
+const next = `export async function sendGAEvent({
   clientId,
   name,
   params = {},
@@ -13,7 +17,7 @@ export async function sendGAEvent({
   const apiSecret = process.env.GA_MEASUREMENT_SECRET;
   if (!measurementId || !apiSecret) return;
 
-  const url = `https://www.google-analytics.com/mp/collect?measurement_id=${measurementId}&api_secret=${apiSecret}`;
+  const url = \`https://www.google-analytics.com/mp/collect?measurement_id=\${measurementId}&api_secret=\${apiSecret}\`;
 
   const debug =
     String(process.env.GA_DEBUG || "")
@@ -43,3 +47,7 @@ export async function sendGAEvent({
     // swallow
   }
 }
+`;
+
+fs.writeFileSync(file, next);
+console.log("[DONE] ga.ts replaced with debug_mode + user_id support");
