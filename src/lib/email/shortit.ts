@@ -21,7 +21,12 @@ function preheader(text: string) {
   </div>`;
 }
 
-function accessHtml(plan: string, level: string, dashboardUrl: string, billingUrl?: string) {
+function accessHtml(
+  plan: string,
+  level: string,
+  dashboardUrl: string,
+  billingUrl?: string,
+) {
   const ph = `Your Short-It access is ready. Plan: ${plan} (${level}).`;
   return `
   ${preheader(ph)}
@@ -75,7 +80,12 @@ function accessHtml(plan: string, level: string, dashboardUrl: string, billingUr
   </div>`;
 }
 
-function accessText(plan: string, level: string, dashboardUrl: string, billingUrl?: string) {
+function accessText(
+  plan: string,
+  level: string,
+  dashboardUrl: string,
+  billingUrl?: string,
+) {
   return [
     "Short-It account access update",
     "",
@@ -98,7 +108,8 @@ export async function sendShortItAccessEmail({
   dashboardUrl,
   billingUrl,
 }: SendShortItEmailArgs) {
-  const from = process.env.RESEND_FROM || "Short-It <no-reply@send.short-it.trade>";
+  const from =
+    process.env.RESEND_FROM || "Short-It <no-reply@send.short-it.trade>";
   const replyTo = process.env.RESEND_REPLY_TO || undefined;
 
   return resend.emails.send({

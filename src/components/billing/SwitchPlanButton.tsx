@@ -2,6 +2,19 @@
 
 import { useMemo, useState } from "react";
 
+function getGaClientId() {
+  if (typeof document === "undefined") return null;
+  // GA cookie usually looks like: GA1.1.123456789.123456789
+  const m = document.cookie.match(/(?:^|;\s*)_ga=([^;]+)/);
+  if (!m) return null;
+  const v = decodeURIComponent(m[1] || "");
+  const parts = v.split(".");
+  // return last two numeric parts (client id) if present, else raw cookie value
+  if (parts.length >= 4)
+    return `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
+  return v || null;
+}
+
 type Tier = "free" | "ideas" | "conviction" | "macro" | "admin";
 type PaidTier = "ideas" | "conviction" | "macro";
 type Step = "choose" | "confirm";
@@ -105,7 +118,10 @@ export default function SwitchPlanButton({
       const res = await fetch("/api/auth/confirm-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw }),
+        body: JSON.stringify({
+          password: pw,
+          ga_client_id: getGaClientId() || undefined,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok)
@@ -138,6 +154,7 @@ export default function SwitchPlanButton({
         body: JSON.stringify({
           tier: selected,
           downgrade_timing: isDowngrade ? downgradeTiming : "renewal",
+          ga_client_id: getGaClientId() || undefined,
         }),
       });
 

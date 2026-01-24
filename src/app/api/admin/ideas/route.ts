@@ -36,7 +36,8 @@ function isOptionKind(kind: string | null) {
 
 export async function GET(req: Request) {
   const admin = await requireAdmin();
-  if (!admin.ok) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  if (!admin.ok)
+    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const url = new URL(req.url);
   const status = url.searchParams.get("status"); // "draft" | "published"
@@ -44,27 +45,32 @@ export async function GET(req: Request) {
   let q = supabaseAdmin
     .from("ideas")
     .select(
-      "id,slug,idea_no,created_at,published_at,status,locked,kind,ticker,direction,entry,reach,option_side,context,strike,exp"
+      "id,slug,idea_no,created_at,published_at,status,locked,kind,ticker,direction,entry,reach,option_side,context,strike,exp",
     )
     .order("created_at", { ascending: false });
 
   if (status === "draft" || status === "published") q = q.eq("status", status);
 
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data: data ?? [] });
 }
 
 export async function POST(req: Request) {
   const admin = await requireAdmin();
-  if (!admin.ok) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  if (!admin.ok)
+    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
 
-  const ticker = String(body?.ticker || "").trim().toUpperCase();
+  const ticker = String(body?.ticker || "")
+    .trim()
+    .toUpperCase();
   const kind = body?.kind ? String(body.kind) : null;
   const locked = !!body?.locked;
-  const status: "draft" | "published" = body?.status === "published" ? "published" : "draft";
+  const status: "draft" | "published" =
+    body?.status === "published" ? "published" : "draft";
 
   const direction = body?.direction ? String(body.direction) : null;
   const entry = body?.entry ?? null;
@@ -75,7 +81,8 @@ export async function POST(req: Request) {
   const strike = body?.strike ?? null;
   const exp = body?.exp ? String(body.exp) : null;
 
-  if (!ticker) return NextResponse.json({ error: "Ticker required" }, { status: 400 });
+  if (!ticker)
+    return NextResponse.json({ error: "Ticker required" }, { status: 400 });
 
   const option = isOptionKind(kind);
   const nowIso = new Date().toISOString();
@@ -113,10 +120,11 @@ export async function POST(req: Request) {
       },
     ])
     .select(
-      "id,slug,idea_no,created_at,published_at,status,locked,kind,ticker,direction,entry,reach,option_side,context,strike,exp"
+      "id,slug,idea_no,created_at,published_at,status,locked,kind,ticker,direction,entry,reach,option_side,context,strike,exp",
     )
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
 }

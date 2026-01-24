@@ -56,7 +56,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     for (const row of data ?? []) {
       const slug = (row as any)?.ideas?.slug;
       if (!slug) continue;
-      const lm = (row as any).published_at ?? (row as any).created_at ?? now.toISOString();
+      const lm =
+        (row as any).published_at ??
+        (row as any).created_at ??
+        now.toISOString();
       out.push({
         url: `${site}/conviction/${slug}`,
         lastModified: new Date(lm),

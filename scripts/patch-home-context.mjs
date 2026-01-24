@@ -14,7 +14,9 @@ const after = `{(i.context ?? i.teaser) ? (
               ) : null}`;
 
 if (!before.test(s)) {
-  console.error("❌ Could not find the teaser block to replace in src/app/page.tsx");
+  console.error(
+    "❌ Could not find the teaser block to replace in src/app/page.tsx",
+  );
   process.exit(1);
 }
 

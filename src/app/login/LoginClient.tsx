@@ -55,7 +55,10 @@ function throttleKey(email: string) {
   return `shortit_login_throttle_v1:${(email || "").toLowerCase()}`;
 }
 
-function throttleRead(email: string): { attempts: number; nextAllowedAt: number } {
+function throttleRead(email: string): {
+  attempts: number;
+  nextAllowedAt: number;
+} {
   try {
     const raw = localStorage.getItem(throttleKey(email));
     if (!raw) return { attempts: 0, nextAllowedAt: 0 };
@@ -71,7 +74,10 @@ function throttleRead(email: string): { attempts: number; nextAllowedAt: number 
 
 function throttleWrite(email: string, attempts: number, nextAllowedAt: number) {
   try {
-    localStorage.setItem(throttleKey(email), JSON.stringify({ attempts, nextAllowedAt }));
+    localStorage.setItem(
+      throttleKey(email),
+      JSON.stringify({ attempts, nextAllowedAt }),
+    );
   } catch {}
 }
 
@@ -93,7 +99,10 @@ export default function LoginClient() {
 
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
-  const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [msg, setMsg] = useState<{
+    kind: "error" | "success";
+    text: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [cooldownMs, setCooldownMs] = useState(0);
@@ -172,19 +181,29 @@ export default function LoginClient() {
     const waitLeft = t.nextAllowedAt - now();
     if (waitLeft > 0) {
       setCooldownMs(waitLeft);
-      setMsg({ kind: "error", text: `Too many attempts. Try again in ${prettySeconds(waitLeft)}s.` });
+      setMsg({
+        kind: "error",
+        text: `Too many attempts. Try again in ${prettySeconds(waitLeft)}s.`,
+      });
       return;
     }
 
     setBusy(true);
-    const { error } = await supabaseAuth.auth.signInWithPassword({ email: e, password });
+    const { error } = await supabaseAuth.auth.signInWithPassword({
+      email: e,
+      password,
+    });
     setBusy(false);
 
     if (error) {
       const msg = (error.message || "").toLowerCase();
 
       // If they haven't confirmed, show the pending confirm screen instead of "wrong password" vibe
-      if (msg.includes("confirm") || msg.includes("confirmed") || msg.includes("not confirmed")) {
+      if (
+        msg.includes("confirm") ||
+        msg.includes("confirmed") ||
+        msg.includes("not confirmed")
+      ) {
         showPending(e);
         return;
       }
@@ -195,7 +214,10 @@ export default function LoginClient() {
 
       throttleWrite(e, attempts, nextAllowedAt);
       setCooldownMs(waitSeconds * 1000);
-      setMsg({ kind: "error", text: `Sign in failed. Try again in ${waitSeconds}s.` });
+      setMsg({
+        kind: "error",
+        text: `Sign in failed. Try again in ${waitSeconds}s.`,
+      });
       return;
     }
 
@@ -266,7 +288,9 @@ export default function LoginClient() {
               if (view === "pending") backToForm();
             }}
             className={`rounded-full px-4 py-2 text-sm ${
-              mode === "signin" ? "bg-white text-black" : "bg-white/5 text-white/70 hover:bg-white/10"
+              mode === "signin"
+                ? "bg-white text-black"
+                : "bg-white/5 text-white/70 hover:bg-white/10"
             }`}
           >
             Sign in
@@ -277,7 +301,9 @@ export default function LoginClient() {
               if (view === "pending") backToForm();
             }}
             className={`rounded-full px-4 py-2 text-sm ${
-              mode === "signup" ? "bg-white text-black" : "bg-white/5 text-white/70 hover:bg-white/10"
+              mode === "signup"
+                ? "bg-white text-black"
+                : "bg-white/5 text-white/70 hover:bg-white/10"
             }`}
           >
             Sign up
@@ -298,15 +324,21 @@ export default function LoginClient() {
 
         {view === "pending" ? (
           <div className="mt-5 rounded-3xl border border-emerald-500/15 bg-emerald-500/10 p-5">
-            <div className="text-base font-semibold text-emerald-50">Check your email for confirmation.</div>
-            <div className="mt-2 text-sm text-emerald-100/80">Didn’t get it? Resend the confirmation email.</div>
+            <div className="text-base font-semibold text-emerald-50">
+              Check your email for confirmation.
+            </div>
+            <div className="mt-2 text-sm text-emerald-100/80">
+              Didn’t get it? Resend the confirmation email.
+            </div>
 
             <button
               onClick={handleResend}
               disabled={busy || resendCooldownMs > 0}
               className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black disabled:opacity-60"
             >
-              {resendCooldownMs > 0 ? `Resend in ${prettySeconds(resendCooldownMs)}s` : "Resend confirmation"}
+              {resendCooldownMs > 0
+                ? `Resend in ${prettySeconds(resendCooldownMs)}s`
+                : "Resend confirmation"}
             </button>
 
             <button
@@ -319,7 +351,9 @@ export default function LoginClient() {
         ) : (
           <div className="mt-5 space-y-4">
             <div>
-              <label className="text-xs tracking-widest text-white/50">Email</label>
+              <label className="text-xs tracking-widest text-white/50">
+                Email
+              </label>
               <input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -330,14 +364,18 @@ export default function LoginClient() {
             </div>
 
             <div>
-              <label className="text-xs tracking-widest text-white/50">Password</label>
+              <label className="text-xs tracking-widest text-white/50">
+                Password
+              </label>
               <input
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none focus:border-white/20"
                 placeholder="••••••••"
                 type="password"
-                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                autoComplete={
+                  mode === "signup" ? "new-password" : "current-password"
+                }
               />
             </div>
 
@@ -349,10 +387,10 @@ export default function LoginClient() {
               {cooldownMs > 0
                 ? `Try again in ${prettySeconds(cooldownMs)}s`
                 : busy
-                ? "Working…"
-                : mode === "signup"
-                ? "Create account"
-                : "Sign in"}
+                  ? "Working…"
+                  : mode === "signup"
+                    ? "Create account"
+                    : "Sign in"}
             </button>
           </div>
         )}

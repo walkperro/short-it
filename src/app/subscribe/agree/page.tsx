@@ -108,10 +108,46 @@ export default function AgreePage() {
       }
 
       // proceed to checkout (or portal redirect / switch)
+
+      // Grab GA client_id (best-effort)
+      let ga_client_id: string | null = null;
+      try {
+        const w: any = typeof window !== "undefined" ? (window as any) : null;
+        const gaId = process.env.NEXT_PUBLIC_GA_ID;
+        if (w && typeof w.gtag === "function" && gaId) {
+          await new Promise<void>((resolve) => {
+            try {
+              w.gtag("get", gaId, "client_id", (cid: any) => {
+                ga_client_id = cid ? String(cid) : null;
+                resolve();
+              });
+            } catch {
+              resolve();
+            }
+            // safety timeout so we never hang the checkout
+            setTimeout(resolve, 250);
+          });
+        }
+      } catch {}
+
+      // proceed to checkout (or portal redirect / switch)
+      // GA intent event: start checkout (confirmed + agreements accepted)
+      try {
+        if (
+          typeof window !== "undefined" &&
+          typeof (window as any).gtag === "function"
+        ) {
+          (window as any).gtag("event", "start_checkout", {
+            tier,
+            source_page: "agree",
+            page_path: window.location?.pathname || "/subscribe/agree",
+          });
+        }
+      } catch {}
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier }),
+        body: JSON.stringify({ tier, ga_client_id }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error ?? "Checkout failed");

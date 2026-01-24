@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 
 const KEY = "shortit_disclaimer_ack_v1";
 
-export default function DisclaimerGate({ children }: { children: React.ReactNode }) {
+export default function DisclaimerGate({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [ok, setOk] = useState(true);
 
   useEffect(() => {
@@ -44,18 +48,28 @@ export default function DisclaimerGate({ children }: { children: React.ReactNode
                 Read this before you enter
               </h1>
               <p className="mt-3 text-white/70">
-                Short-It content is for educational purposes only. Nothing on this site is financial advice,
-                investment advice, or a recommendation to buy or sell any security.
+                Short-It content is for educational purposes only. Nothing on
+                this site is financial advice, investment advice, or a
+                recommendation to buy or sell any security.
               </p>
             </div>
           </div>
 
           <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 p-5 text-white/70">
             <ul className="list-disc space-y-2 pl-5">
-              <li>You are responsible for your own trades, risk management, and tax obligations.</li>
-              <li>Trading involves substantial risk and can result in losses up to your full investment.</li>
+              <li>
+                You are responsible for your own trades, risk management, and
+                tax obligations.
+              </li>
+              <li>
+                Trading involves substantial risk and can result in losses up to
+                your full investment.
+              </li>
               <li>Past performance does not guarantee future results.</li>
-              <li>By continuing, you confirm you are of legal age in your jurisdiction to trade.</li>
+              <li>
+                By continuing, you confirm you are of legal age in your
+                jurisdiction to trade.
+              </li>
             </ul>
           </div>
 
@@ -77,7 +91,8 @@ export default function DisclaimerGate({ children }: { children: React.ReactNode
           </div>
 
           <div className="mt-4 text-xs text-white/40">
-            This acknowledgment is stored in your browser. Clear site data to see this screen again.
+            This acknowledgment is stored in your browser. Clear site data to
+            see this screen again.
           </div>
         </div>
       </div>

@@ -11,10 +11,9 @@ export function ideaJsonLd(opts: {
 }) {
   const level = opts.level ?? "Ideas";
   const ticker = (opts.ticker ?? "").toUpperCase();
-  const headline =
-    ticker
-      ? `${ticker} — ${level}${opts.kind ? ` (${opts.kind})` : ""}`
-      : `${level}${opts.kind ? ` (${opts.kind})` : ""}`;
+  const headline = ticker
+    ? `${ticker} — ${level}${opts.kind ? ` (${opts.kind})` : ""}`
+    : `${level}${opts.kind ? ` (${opts.kind})` : ""}`;
 
   const desc =
     (opts.teaser && String(opts.teaser).trim()) ||
@@ -37,7 +36,11 @@ export function ideaJsonLd(opts: {
 
   // Optional extra metadata for richer SERP display
   if (opts.ideaNo != null) {
-    out.identifier = { "@type": "PropertyValue", name: "ideaNo", value: String(opts.ideaNo) };
+    out.identifier = {
+      "@type": "PropertyValue",
+      name: "ideaNo",
+      value: String(opts.ideaNo),
+    };
   }
 
   return out;

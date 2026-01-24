@@ -19,7 +19,9 @@ export default function UpdatePasswordPage() {
       // If they got here without a recovery session, they'll be unauthenticated
       setLoading(false);
       if (!data.session) {
-        setErr("Your reset link is invalid or expired. Request a new reset email.");
+        setErr(
+          "Your reset link is invalid or expired. Request a new reset email.",
+        );
       }
     });
   }, [supabase]);
@@ -102,7 +104,11 @@ export default function UpdatePasswordPage() {
         </button>
 
         <div className="mt-3 text-xs text-white/40">
-          If your link expired, go back to <a className="underline" href="/reset-password">Reset password</a>.
+          If your link expired, go back to{" "}
+          <a className="underline" href="/reset-password">
+            Reset password
+          </a>
+          .
         </div>
       </div>
     </main>

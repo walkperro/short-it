@@ -2,7 +2,12 @@
 
 export default function LockIcon({ className = "" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M7 10V8a5 5 0 0 1 10 0v2"
         stroke="currentColor"

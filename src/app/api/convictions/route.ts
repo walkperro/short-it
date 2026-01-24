@@ -6,11 +6,14 @@ export const runtime = "nodejs";
 export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("convictions")
-    .select("id,idea_id,status,body,created_at,published_at,ideas:idea_id(slug,idea_no,ticker,kind)")
+    .select(
+      "id,idea_id,status,body,created_at,published_at,ideas:idea_id(slug,idea_no,ticker,kind)",
+    )
     .eq("status", "published")
     .order("published_at", { ascending: false, nullsFirst: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
 
   const out = (data ?? []).map((r: any) => ({
     id: r.id,

@@ -15,7 +15,7 @@ const PRICE_BY_TIER: Record<string, string | undefined> = {
 };
 
 export async function POST(req: NextRequest) {
-  const { tier } = await req.json().catch(() => ({}) as any);
+  const { tier, ga_client_id } = await req.json().catch(() => ({}) as any);
 
   if (!tier || !PRICE_BY_TIER[tier]) {
     return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
@@ -140,9 +140,17 @@ export async function POST(req: NextRequest) {
     customer: customerId,
     line_items: [{ price: PRICE_BY_TIER[tier]!, quantity: 1 }],
     subscription_data: {
-      metadata: { userId: user.id, tier },
+      metadata: {
+        userId: user.id,
+        tier,
+        ...(ga_client_id ? { ga_client_id: String(ga_client_id) } : {}),
+      },
     },
-    metadata: { userId: user.id, tier },
+    metadata: {
+      userId: user.id,
+      tier,
+      ...(ga_client_id ? { ga_client_id: String(ga_client_id) } : {}),
+    },
     success_url: `${siteUrl}/account?success=1`,
     cancel_url: `${siteUrl}/subscribe?canceled=1`,
   });

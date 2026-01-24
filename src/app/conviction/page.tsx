@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { FilterChips } from "@/components/FilterChips";
 import LockIcon from "@/components/LockIcon";
-import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
+import {
+  createSupabaseServerClient,
+  supabaseAdmin,
+} from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { canAccess, normalizePlan, type Plan } from "@/lib/entitlements";
 
@@ -54,10 +57,10 @@ function fmtIdeaNo(n?: number | null) {
 }
 
 function fmtNY(iso: string) {
-  return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York" });
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: "America/New_York",
+  });
 }
-
-
 
 function dirBadge(direction?: string | null, optionSide?: string | null) {
   const raw = (direction ?? optionSide ?? "—") as any;
@@ -66,8 +69,8 @@ function dirBadge(direction?: string | null, optionSide?: string | null) {
     raw === "long" || raw === "call"
       ? "bg-emerald-500/15 text-emerald-400"
       : raw === "short" || raw === "put"
-      ? "bg-red-500/15 text-red-400"
-      : "bg-white/10 text-white/80";
+        ? "bg-red-500/15 text-red-400"
+        : "bg-white/10 text-white/80";
   return { up, cls };
 }
 
@@ -106,9 +109,16 @@ function LockedCard() {
 }
 
 export default async function ConvictionPage(props: {
-  searchParams?: Promise<{ kind?: string | string[]; ticker?: string | string[]; from?: string | string[]; to?: string | string[] }>;
+  searchParams?: Promise<{
+    kind?: string | string[];
+    ticker?: string | string[];
+    from?: string | string[];
+    to?: string | string[];
+  }>;
 }) {
-  const searchParams = (props.searchParams ? await props.searchParams : {}) as any;
+  const searchParams = (
+    props.searchParams ? await props.searchParams : {}
+  ) as any;
 
   // viewer (server auth)
   const supabase = await createSupabaseServerClient();
@@ -145,13 +155,14 @@ export default async function ConvictionPage(props: {
     .select(
       "id,idea_id,status,body,created_at,published_at,ideas:idea_id!inner(slug,idea_no,ticker,kind,direction,option_side,created_at,published_at,status)",
     )
-    .eq("status","published").eq("ideas.status","published").order("published_at", { ascending: false, nullsFirst: false });
+    .eq("status", "published")
+    .eq("ideas.status", "published")
+    .order("published_at", { ascending: false, nullsFirst: false });
 
-  
   if (tickerParam) {
     q = q.ilike("ideas.ticker", `%${tickerParam}%`);
   }
-// filters (server-side) — same behavior as /ideas
+  // filters (server-side) — same behavior as /ideas
   if (kindParam && kindParam !== "all") {
     q = q.ilike("ideas.kind", kindParam);
   }
@@ -173,9 +184,15 @@ export default async function ConvictionPage(props: {
   return (
     <main className="mx-auto max-w-6xl p-6 text-white">
       <div>
-        <div className="level-fade text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Conviction</h1>
-        <p className="mt-1 text-sm text-white/60">Unlocked for Conviction+ members.</p>
+        <div className="level-fade text-xs tracking-[0.35em] text-white/40">
+          LEVEL II
+        </div>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+          Conviction
+        </h1>
+        <p className="mt-1 text-sm text-white/60">
+          Unlocked for Conviction+ members.
+        </p>
       </div>
 
       {/* Filters */}
@@ -187,11 +204,16 @@ export default async function ConvictionPage(props: {
         <input id="filters-open" type="checkbox" className="peer hidden" />
         <label
           htmlFor="filters-open"
-          className="mb-3 flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-3 md:hidden peer-checked:[&_.filters-plus]:opacity-0 transition-opacity delay-[120ms] peer-checked:[&_.filters-plus]:scale-90 peer-checked:[&_.filters-x]:opacity-100 peer-checked:[&_.filters-x]:scale-100 peer-checked:[&_.filters-x]:animate-luxpop">
+          className="mb-3 flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-3 md:hidden peer-checked:[&_.filters-plus]:opacity-0 transition-opacity delay-[120ms] peer-checked:[&_.filters-plus]:scale-90 peer-checked:[&_.filters-x]:opacity-100 peer-checked:[&_.filters-x]:scale-100 peer-checked:[&_.filters-x]:animate-luxpop"
+        >
           <span className="text-xs tracking-widest text-white/60">FILTERS</span>
           <span className="relative inline-flex h-6 w-6 items-center justify-center text-lg font-light text-white/60">
-            <span className="filters-plus transition-all duration-300 ease-out opacity-100 scale-100">+</span>
-            <span className="filters-x absolute inset-0 flex items-center justify-center opacity-0 transition-opacity delay-[120ms] scale-90 transition-all duration-300 ease-out">×</span>
+            <span className="filters-plus transition-all duration-300 ease-out opacity-100 scale-100">
+              +
+            </span>
+            <span className="filters-x absolute inset-0 flex items-center justify-center opacity-0 transition-opacity delay-[120ms] scale-90 transition-all duration-300 ease-out">
+              ×
+            </span>
           </span>
         </label>
 
@@ -214,7 +236,9 @@ export default async function ConvictionPage(props: {
             </div>
 
             <div>
-              <div className="text-xs tracking-widest text-white/50">TICKER</div>
+              <div className="text-xs tracking-widest text-white/50">
+                TICKER
+              </div>
               <input
                 name="ticker"
                 placeholder="SPY"
@@ -289,7 +313,13 @@ export default async function ConvictionPage(props: {
           return (
             <Link
               key={c.id}
-              href={slug ? (allowed ? `/conviction/${slug}/full` : `/conviction/${slug}`) : "/conviction"}
+              href={
+                slug
+                  ? allowed
+                    ? `/conviction/${slug}/full`
+                    : `/conviction/${slug}`
+                  : "/conviction"
+              }
               className="rounded-2xl border border-white/10 bg-black/40 p-5 transition hover:border-white/20 hover:bg-black/60"
             >
               <div className="flex items-center justify-between">
@@ -297,18 +327,28 @@ export default async function ConvictionPage(props: {
                   IDEA #{fmtIdeaNo(idea?.idea_no)} • {idea?.ticker || "—"}
                 </div>
                 {(() => {
-  const b = dirBadge((idea as any)?.direction ?? null, (idea as any)?.option_side ?? null);
-  return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${b.cls}`}>{b.up}</span>
-  );
-})()}
+                  const b = dirBadge(
+                    (idea as any)?.direction ?? null,
+                    (idea as any)?.option_side ?? null,
+                  );
+                  return (
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${b.cls}`}
+                    >
+                      {b.up}
+                    </span>
+                  );
+                })()}
               </div>
 
               <div className="mt-3 text-lg font-semibold leading-snug">
-                {idea?.ticker || "—"} <span className="text-white/40">•</span> {idea?.kind || "Conviction"}
+                {idea?.ticker || "—"} <span className="text-white/40">•</span>{" "}
+                {idea?.kind || "Conviction"}
               </div>
 
-              <p className="mt-3 text-sm text-white/70 line-clamp-4">{c.body || "—"}</p>
+              <p className="mt-3 text-sm text-white/70 line-clamp-4">
+                {c.body || "—"}
+              </p>
 
               <div className="mt-4 text-xs text-white/40">{fmtNY(when)}</div>
             </Link>

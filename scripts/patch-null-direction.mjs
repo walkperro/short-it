@@ -13,19 +13,21 @@ for (const f of files) {
   // With: (something.direction ?? something.option_side ?? "—").toUpperCase()
   s = s.replace(
     /(\b[A-Za-z_$][\w$]*)(\?\.)?direction\.toUpperCase\(\)/g,
-    (_m, obj) => `(${obj}.direction ?? ${obj}.option_side ?? "—").toUpperCase()`
+    (_m, obj) =>
+      `(${obj}.direction ?? ${obj}.option_side ?? "—").toUpperCase()`,
   );
 
   // Replace: something.direction!.toUpperCase() (if any)
   s = s.replace(
     /(\b[A-Za-z_$][\w$]*)\.direction!\.toUpperCase\(\)/g,
-    (_m, obj) => `(${obj}.direction ?? ${obj}.option_side ?? "—").toUpperCase()`
+    (_m, obj) =>
+      `(${obj}.direction ?? ${obj}.option_side ?? "—").toUpperCase()`,
   );
 
   // Replace: direct "direction.toUpperCase()" (rare)
   s = s.replace(
     /\bdirection\.toUpperCase\(\)/g,
-    `(direction ?? option_side ?? "—").toUpperCase()`
+    `(direction ?? option_side ?? "—").toUpperCase()`,
   );
 
   if (s !== before) {

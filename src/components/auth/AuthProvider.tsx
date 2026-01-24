@@ -52,7 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }
 
-  return <Ctx.Provider value={{ user, loading, signOut }}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={{ user, loading, signOut }}>{children}</Ctx.Provider>
+  );
 }
 
 export function useAuth() {

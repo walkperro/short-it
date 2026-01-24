@@ -57,7 +57,9 @@ export default function ConvictionAdmin() {
   const [published, setPublished] = useState<AdminConviction[]>([]);
 
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(
+    null,
+  );
 
   const [editing, setEditing] = useState<AdminConviction | null>(null);
   const [ideaId, setIdeaId] = useState<string>("");
@@ -78,11 +80,17 @@ export default function ConvictionAdmin() {
   async function loadAll() {
     setMsg(null);
     try {
-      const i = await api<{ data: IdeaPick[] }>("/api/admin/ideas?status=published");
+      const i = await api<{ data: IdeaPick[] }>(
+        "/api/admin/ideas?status=published",
+      );
       setIdeas(i.data || []);
 
-      const d = await api<{ data: AdminConviction[] }>("/api/admin/convictions?status=draft");
-      const p = await api<{ data: AdminConviction[] }>("/api/admin/convictions?status=published");
+      const d = await api<{ data: AdminConviction[] }>(
+        "/api/admin/convictions?status=draft",
+      );
+      const p = await api<{ data: AdminConviction[] }>(
+        "/api/admin/convictions?status=published",
+      );
       setDrafts(d.data || []);
       setPublished(p.data || []);
     } catch (e: any) {
@@ -120,13 +128,20 @@ export default function ConvictionAdmin() {
           method: "PUT",
           body: JSON.stringify(payload),
         });
-        setMsg({ kind: "ok", text: status === "published" ? "Updated + published." : "Draft updated." });
+        setMsg({
+          kind: "ok",
+          text:
+            status === "published" ? "Updated + published." : "Draft updated.",
+        });
       } else {
         await api(`/api/admin/convictions`, {
           method: "POST",
           body: JSON.stringify(payload),
         });
-        setMsg({ kind: "ok", text: status === "published" ? "Published." : "Saved to drafts." });
+        setMsg({
+          kind: "ok",
+          text: status === "published" ? "Published." : "Saved to drafts.",
+        });
       }
 
       resetForm();
@@ -168,7 +183,10 @@ export default function ConvictionAdmin() {
         method: "PUT",
         body: JSON.stringify({ status }),
       });
-      setMsg({ kind: "ok", text: status === "published" ? "Published." : "Moved to drafts." });
+      setMsg({
+        kind: "ok",
+        text: status === "published" ? "Published." : "Moved to drafts.",
+      });
       await loadAll();
     } catch (e: any) {
       setMsg({ kind: "err", text: e?.message || "Update failed." });
@@ -177,14 +195,20 @@ export default function ConvictionAdmin() {
     }
   }
 
-  const selectedIdea = (ideaId && ideaById.get(ideaId)) || (editing ? ideaById.get(editing.idea_id) : null);
+  const selectedIdea =
+    (ideaId && ideaById.get(ideaId)) ||
+    (editing ? ideaById.get(editing.idea_id) : null);
 
   return (
     <div>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <div className="text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight">Conviction</h2>
+          <div className="text-xs tracking-[0.35em] text-white/40">
+            LEVEL II
+          </div>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+            Conviction
+          </h2>
           <p className="mt-1 text-sm text-white/60">
             Select an idea, write the conviction, save draft or publish.
           </p>
@@ -248,16 +272,22 @@ export default function ConvictionAdmin() {
               <option value="">— Select —</option>
               {ideas.map((i) => (
                 <option key={i.id} value={i.id}>
-                  #{fmtIdeaNo(i.idea_no)} • {i.ticker || "—"} • {i.kind || "—"} • {fmtDate(i.published_at || i.created_at)}
+                  #{fmtIdeaNo(i.idea_no)} • {i.ticker || "—"} • {i.kind || "—"}{" "}
+                  • {fmtDate(i.published_at || i.created_at)}
                 </option>
               ))}
             </select>
 
             {selectedIdea ? (
               <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-3 text-sm text-white/80">
-                Selected: <span className="font-semibold">{selectedIdea.ticker || "—"}</span>{" "}
-                <span className="text-white/40">•</span> {selectedIdea.kind || "—"}{" "}
-                <span className="text-white/40">•</span> IDEA #{fmtIdeaNo(selectedIdea.idea_no)}
+                Selected:{" "}
+                <span className="font-semibold">
+                  {selectedIdea.ticker || "—"}
+                </span>{" "}
+                <span className="text-white/40">•</span>{" "}
+                {selectedIdea.kind || "—"}{" "}
+                <span className="text-white/40">•</span> IDEA #
+                {fmtIdeaNo(selectedIdea.idea_no)}
               </div>
             ) : null}
           </div>
@@ -295,7 +325,10 @@ export default function ConvictionAdmin() {
       </div>
 
       {/* DRAFTS */}
-      <Section title={`Drafts (${drafts.length})`} subtitle="Conviction drafts (not visible to users).">
+      <Section
+        title={`Drafts (${drafts.length})`}
+        subtitle="Conviction drafts (not visible to users)."
+      >
         {drafts.length ? (
           <div className="space-y-3">
             {drafts.map((c) => (
@@ -315,7 +348,10 @@ export default function ConvictionAdmin() {
       </Section>
 
       {/* PUBLISHED */}
-      <Section title={`Published (${published.length})`} subtitle="Published convictions (visible on /conviction for members).">
+      <Section
+        title={`Published (${published.length})`}
+        subtitle="Published convictions (visible on /conviction for members)."
+      >
         {published.length ? (
           <div className="space-y-3">
             {published.map((c) => (
@@ -337,20 +373,34 @@ export default function ConvictionAdmin() {
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+function Section({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="mt-8">
       <div>
         <div className="text-lg font-semibold">{title}</div>
         <div className="mt-1 text-sm text-white/60">{subtitle}</div>
       </div>
-      <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">{children}</div>
+      <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+        {children}
+      </div>
     </div>
   );
 }
 
 function Empty({ text }: { text: string }) {
-  return <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">{text}</div>;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
+      {text}
+    </div>
+  );
 }
 
 function Row({
@@ -372,7 +422,11 @@ function Row({
         <div>
           <div className="text-xs tracking-widest text-white/50">
             IDEA #{fmtIdeaNo(c.idea_no)} • {c.kind || "—"} • {c.ticker || "—"} •{" "}
-            {fmtDate(c.status === "published" ? c.published_at || c.created_at : c.created_at)}
+            {fmtDate(
+              c.status === "published"
+                ? c.published_at || c.created_at
+                : c.created_at,
+            )}
           </div>
           {c.body ? (
             <div className="mt-2 line-clamp-2 text-sm text-white/80">
@@ -384,13 +438,22 @@ function Row({
         </div>
 
         <div className="flex gap-2">
-          <button onClick={onEdit} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10">
+          <button
+            onClick={onEdit}
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10"
+          >
             Edit
           </button>
-          <button onClick={onPrimary} className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-black hover:opacity-90">
+          <button
+            onClick={onPrimary}
+            className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-black hover:opacity-90"
+          >
             {primaryLabel}
           </button>
-          <button onClick={onDelete} className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-100 hover:bg-red-500/15">
+          <button
+            onClick={onDelete}
+            className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-100 hover:bg-red-500/15"
+          >
             Delete
           </button>
         </div>

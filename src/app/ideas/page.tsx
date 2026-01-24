@@ -2,13 +2,21 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Ideas",
-  description: "Short-It Ideas — timestamped trade ideas in a clean, simple format.",
+  description:
+    "Short-It Ideas — timestamped trade ideas in a clean, simple format.",
   alternates: { canonical: "/ideas" },
   openGraph: {
     title: "Short-It Ideas",
     description: "Timestamped trade ideas in a clean, simple format.",
     url: "/ideas",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "SHORT-IT — Trade Intel" }],
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "SHORT-IT — Trade Intel",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
@@ -78,9 +86,16 @@ function nextDayStartISO(yyyy_mm_dd: string) {
 }
 
 export default async function IdeasPage(props: {
-  searchParams?: Promise<{ kind?: string | string[]; ticker?: string | string[]; from?: string | string[]; to?: string | string[] }>;
+  searchParams?: Promise<{
+    kind?: string | string[];
+    ticker?: string | string[];
+    from?: string | string[];
+    to?: string | string[];
+  }>;
 }) {
-  const searchParams = (props.searchParams ? await props.searchParams : {}) as any;
+  const searchParams = (
+    props.searchParams ? await props.searchParams : {}
+  ) as any;
 
   // viewer (server auth)
   const supabase = await createSupabaseServerClient();
@@ -154,8 +169,10 @@ export default async function IdeasPage(props: {
     <main className="mx-auto max-w-6xl p-6 text-white">
       <div className="flex items-end justify-between">
         <div>
-          <div className="level-fade text-xs tracking-[0.35em] text-white/40">LEVEL I</div>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Ideas</h1>
+          <div className="level-fade text-xs tracking-[0.35em] text-white/40">
+            LEVEL I
+          </div>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Ideas</h1>
           <p className="mt-1 text-sm text-white/60">
             {isFree
               ? "Upgrade to see more trade ideas."
@@ -182,11 +199,16 @@ export default async function IdeasPage(props: {
         <input id="filters-open" type="checkbox" className="peer hidden" />
         <label
           htmlFor="filters-open"
-          className="mb-3 flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-3 md:hidden peer-checked:[&_.filters-plus]:opacity-0 transition-opacity delay-[120ms] peer-checked:[&_.filters-plus]:scale-90 peer-checked:[&_.filters-x]:opacity-100 peer-checked:[&_.filters-x]:scale-100 peer-checked:[&_.filters-x]:animate-luxpop">
+          className="mb-3 flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-3 md:hidden peer-checked:[&_.filters-plus]:opacity-0 transition-opacity delay-[120ms] peer-checked:[&_.filters-plus]:scale-90 peer-checked:[&_.filters-x]:opacity-100 peer-checked:[&_.filters-x]:scale-100 peer-checked:[&_.filters-x]:animate-luxpop"
+        >
           <span className="text-xs tracking-widest text-white/60">FILTERS</span>
           <span className="relative inline-flex h-6 w-6 items-center justify-center text-lg font-light text-white/60">
-            <span className="filters-plus transition-all duration-300 ease-out opacity-100 scale-100">+</span>
-            <span className="filters-x absolute inset-0 flex items-center justify-center opacity-0 transition-opacity delay-[120ms] scale-90 transition-all duration-300 ease-out">×</span>
+            <span className="filters-plus transition-all duration-300 ease-out opacity-100 scale-100">
+              +
+            </span>
+            <span className="filters-x absolute inset-0 flex items-center justify-center opacity-0 transition-opacity delay-[120ms] scale-90 transition-all duration-300 ease-out">
+              ×
+            </span>
           </span>
         </label>
 
@@ -209,7 +231,9 @@ export default async function IdeasPage(props: {
             </div>
 
             <div>
-              <div className="text-xs tracking-widest text-white/50">TICKER</div>
+              <div className="text-xs tracking-widest text-white/50">
+                TICKER
+              </div>
               <input
                 name="ticker"
                 placeholder="SPY"
@@ -267,9 +291,7 @@ export default async function IdeasPage(props: {
         labelMap={{ kind: "TYPE", ticker: "TICKER", from: "FROM", to: "TO" }}
       />
 
-
-
-{errorMsg ? (
+      {errorMsg ? (
         <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {errorMsg}
         </div>

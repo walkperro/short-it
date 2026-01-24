@@ -5,6 +5,19 @@ import Link from "next/link";
 import Image from "next/image";
 import LockIcon from "@/components/LockIcon";
 
+function getGaClientId() {
+  if (typeof document === "undefined") return null;
+  // GA cookie usually looks like: GA1.1.123456789.123456789
+  const m = document.cookie.match(/(?:^|;\s*)_ga=([^;]+)/);
+  if (!m) return null;
+  const v = decodeURIComponent(m[1] || "");
+  const parts = v.split(".");
+  // return last two numeric parts (client id) if present, else raw cookie value
+  if (parts.length >= 4)
+    return `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
+  return v || null;
+}
+
 type Tier = "free" | "ideas" | "conviction" | "macro" | "admin";
 
 const AGREEMENTS_VERSION =
@@ -121,10 +134,26 @@ export default function SubscribePage() {
   async function checkout(tier: Exclude<Tier, "free" | "admin">) {
     setErr(null);
     try {
+      // GA intent event: start checkout
+      try {
+        if (
+          typeof window !== "undefined" &&
+          typeof (window as any).gtag === "function"
+        ) {
+          (window as any).gtag("event", "start_checkout", {
+            tier,
+            source_page: "subscribe",
+            page_path: window.location?.pathname || "/subscribe",
+          });
+        }
+      } catch {}
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier }),
+        body: JSON.stringify({
+          tier,
+          ga_client_id: getGaClientId() || undefined,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -163,7 +192,10 @@ export default function SubscribePage() {
       const res = await fetch("/api/stripe/switch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier: nextTier }),
+        body: JSON.stringify({
+          tier: nextTier,
+          ga_client_id: getGaClientId() || undefined,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {

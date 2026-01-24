@@ -7,14 +7,16 @@ let s = fs.readFileSync(file, "utf8");
 if (!s.includes("const [strike")) {
   s = s.replace(
     /const \[reach, setReach\] = useState<string>\(""\);\s*/m,
-    (m) => m + `const [strike, setStrike] = useState<string>("");\n  const [exp, setExp] = useState<string>("");\n  `
+    (m) =>
+      m +
+      `const [strike, setStrike] = useState<string>("");\n  const [exp, setExp] = useState<string>("");\n  `,
   );
 }
 
 // 2) Ensure resetForm resets strike/exp
 s = s.replace(
   /setReach\(""\);\s*/m,
-  (m) => m + `setStrike("");\n    setExp("");\n    `
+  (m) => m + `setStrike("");\n    setExp("");\n    `,
 );
 
 // 3) Ensure startEdit loads strike/exp
@@ -23,7 +25,7 @@ if (!s.includes("setStrike(") || !s.includes("setExp(")) {
     /setReach\(i\.reach == null \? "" : String\(i\.reach\)\);\s*/m,
     (m) =>
       m +
-      `    setStrike((i.strike == null ? "" : String(i.strike)));\n    setExp((i.exp == null ? "" : String(i.exp)));\n`
+      `    setStrike((i.strike == null ? "" : String(i.strike)));\n    setExp((i.exp == null ? "" : String(i.exp)));\n`,
   );
 }
 
@@ -45,19 +47,22 @@ s = s.replace(
       exp: isOption ? (exp.trim() || null) : null,
 
       context: context.trim(),
-    };`
+    };`,
 );
 
 // 5) Expand AdminIdea type with strike/exp if missing
 if (!s.includes("strike:")) {
   s = s.replace(
     /option_side: "call" \| "put" \| null;\s*context: string \| null;\s*/m,
-    (m) => m + `  strike: number | null;\n  exp: string | null;\n`
+    (m) => m + `  strike: number | null;\n  exp: string | null;\n`,
   );
 }
 
 // 6) Add UI fields Strike + Exp (only when isOption)
-if (!s.includes('label="Strike (options only)"') && !s.includes('label="Exp (options only)"')) {
+if (
+  !s.includes('label="Strike (options only)"') &&
+  !s.includes('label="Exp (options only)"')
+) {
   s = s.replace(
     /<Field label="Reach">[\s\S]*?<\/Field>\s*/m,
     (block) =>
@@ -94,13 +99,19 @@ if (!s.includes('label="Strike (options only)"') && !s.includes('label="Exp (opt
               ].join(" ")}
             />
           </Field>
-`
+`,
   );
 }
 
 // 7) Make sure Save/Publish buttons are not accidental submit buttons
-s = s.replace(/<button(\s+disabled=\{busy\}\s+onClick=\{\(\) => save\("draft"\)\})/g, '<button type="button"$1');
-s = s.replace(/<button(\s+disabled=\{busy\}\s+onClick=\{\(\) => save\("published"\)\})/g, '<button type="button"$1');
+s = s.replace(
+  /<button(\s+disabled=\{busy\}\s+onClick=\{\(\) => save\("draft"\)\})/g,
+  '<button type="button"$1',
+);
+s = s.replace(
+  /<button(\s+disabled=\{busy\}\s+onClick=\{\(\) => save\("published"\)\})/g,
+  '<button type="button"$1',
+);
 
 fs.writeFileSync(file, s);
 console.log("Patched AdminClient.tsx ✅");

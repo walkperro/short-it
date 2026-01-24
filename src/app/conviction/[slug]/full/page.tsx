@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import LockIcon from "@/components/LockIcon";
-import { createSupabaseServerClient, supabaseAdmin } from "@/lib/supabase/server";
+import {
+  createSupabaseServerClient,
+  supabaseAdmin,
+} from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import { canAccess, normalizePlan, type Plan } from "@/lib/entitlements";
 
@@ -16,7 +19,9 @@ function fmtIdeaNo(n?: number | null) {
 }
 
 function fmtNY(iso: string) {
-  return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York" });
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: "America/New_York",
+  });
 }
 
 function dirBadge(direction?: string | null, optionSide?: string | null) {
@@ -26,8 +31,8 @@ function dirBadge(direction?: string | null, optionSide?: string | null) {
     raw === "long" || raw === "call"
       ? "bg-emerald-500/15 text-emerald-400"
       : raw === "short" || raw === "put"
-      ? "bg-red-500/15 text-red-400"
-      : "bg-white/10 text-white/80";
+        ? "bg-red-500/15 text-red-400"
+        : "bg-white/10 text-white/80";
   return { up, cls };
 }
 
@@ -37,13 +42,23 @@ function LockedFull() {
       <div className="flex items-center gap-2 text-xs text-white/60">
         <LockIcon className="h-4 w-4 text-white/60" /> Locked
       </div>
-      <div className="mt-2 text-xl font-semibold">Upgrade to unlock full Conviction</div>
-      <p className="mt-2 text-sm text-white/70">This page is available to Conviction+ members.</p>
+      <div className="mt-2 text-xl font-semibold">
+        Upgrade to unlock full Conviction
+      </div>
+      <p className="mt-2 text-sm text-white/70">
+        This page is available to Conviction+ members.
+      </p>
       <div className="mt-5 flex gap-3">
-        <Link href="/subscribe" className="rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-black">
+        <Link
+          href="/subscribe"
+          className="rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-black"
+        >
           Upgrade
         </Link>
-        <Link href="/conviction" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10">
+        <Link
+          href="/conviction"
+          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white/80 hover:bg-white/10"
+        >
           Back
         </Link>
       </div>
@@ -51,7 +66,11 @@ function LockedFull() {
   );
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
   const { slug } = await params;
 
   const { data } = await supabaseAdmin
@@ -61,8 +80,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     .maybeSingle();
 
   const titleCore = data?.ticker ? `${data.ticker} — Conviction` : "Conviction";
-  const title = data?.idea_no ? `${titleCore} #${fmtIdeaNo(Number(data.idea_no))}` : titleCore;
-  const description = (data?.summary ?? data?.context ?? "Full conviction write-up.").slice(0, 160);
+  const title = data?.idea_no
+    ? `${titleCore} #${fmtIdeaNo(Number(data.idea_no))}`
+    : titleCore;
+  const description = (
+    data?.summary ??
+    data?.context ??
+    "Full conviction write-up."
+  ).slice(0, 160);
 
   return {
     title,
@@ -72,11 +97,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-export default async function ConvictionFullPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ConvictionFullPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   const { slug } = await params;
 
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   let plan: Plan = "free";
   let isAdmin = false;
@@ -96,7 +127,9 @@ export default async function ConvictionFullPage({ params }: { params: Promise<{
 
   const { data, error } = await supabaseAdmin
     .from("convictions")
-    .select("id,idea_id,status,body,created_at,published_at,ideas:idea_id!inner(slug,idea_no,ticker,kind,direction,option_side,created_at,published_at,status)")
+    .select(
+      "id,idea_id,status,body,created_at,published_at,ideas:idea_id!inner(slug,idea_no,ticker,kind,direction,option_side,created_at,published_at,status)",
+    )
     .eq("status", "published")
     .eq("ideas.slug", slug)
     .limit(1)
@@ -107,7 +140,9 @@ export default async function ConvictionFullPage({ params }: { params: Promise<{
     return (
       <main className="mx-auto max-w-3xl p-6 text-white">
         <div className="text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Conviction</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+          Conviction
+        </h1>
         <LockedFull />
       </main>
     );
@@ -121,22 +156,31 @@ export default async function ConvictionFullPage({ params }: { params: Promise<{
     <main className="mx-auto max-w-3xl p-6 text-white">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <div className="text-xs tracking-[0.35em] text-white/40">LEVEL II</div>
+          <div className="text-xs tracking-[0.35em] text-white/40">
+            LEVEL II
+          </div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            {idea?.ticker || "—"} <span className="text-white/40">•</span> Conviction #{fmtIdeaNo(idea?.idea_no)}
+            {idea?.ticker || "—"} <span className="text-white/40">•</span>{" "}
+            Conviction #{fmtIdeaNo(idea?.idea_no)}
           </h1>
           <div className="mt-2 text-xs text-white/40">{fmtNY(when)}</div>
         </div>
 
         <div className="flex items-center gap-3">
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${b.cls}`}>{b.up}</span>
-</div>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${b.cls}`}
+          >
+            {b.up}
+          </span>
+        </div>
       </div>
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-black/40 p-6">
-        <p className="mt-3 text-sm text-white/75 whitespace-pre-wrap">{(data as any).body || "—"}</p>
+        <p className="mt-3 text-sm text-white/75 whitespace-pre-wrap">
+          {(data as any).body || "—"}
+        </p>
       </div>
-    
+
       <div className="mt-6">
         <Link
           href="/conviction"
@@ -145,6 +189,6 @@ export default async function ConvictionFullPage({ params }: { params: Promise<{
           Back to Convictions
         </Link>
       </div>
-</main>
+    </main>
   );
 }

@@ -6,7 +6,7 @@ let s = fs.readFileSync(file, "utf8");
 // 1) Ensure "not logged in" includes profile:null
 s = s.replace(
   /if\s*\(!user\)\s*return\s*NextResponse\.json\(\{\s*plan:\s*"free",\s*is_admin:\s*false,\s*user:\s*null\s*\}\);/m,
-  `if (!user) return NextResponse.json({ plan: "free", is_admin: false, user: null, profile: null });`
+  `if (!user) return NextResponse.json({ plan: "free", is_admin: false, user: null, profile: null });`,
 );
 
 // 2) Remove "admin overrides plan to 'admin'" so real plan is returned
@@ -17,7 +17,7 @@ s = s.replace(
 
 // Always return the real subscription plan; keep is_admin separate for access/unlock
 const plan = (profile?.plan ?? "free");
-`
+`,
 );
 
 fs.writeFileSync(file, s, "utf8");

@@ -13,8 +13,6 @@ type Idea = {
   created_at: string;
 };
 
-
-
 function LockedCard() {
   return (
     <div className="relative min-w-[320px] max-w-[360px] shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-black/40 p-5">
@@ -32,12 +30,17 @@ function LockedCard() {
         </div>
 
         <div className="mt-6 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-white/60"><LockIcon className="h-4 w-4 text-white/60" /> Locked</div>
+          <div className="flex items-center gap-2 text-xs text-white/60">
+            <LockIcon className="h-4 w-4 text-white/60" /> Locked
+          </div>
           <Link
             href="/subscribe"
             className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15 transition"
           >
-            Upgrade to unlock <span className="ml-2 inline-flex items-center"><LockIcon className="h-4 w-4 text-white/80" /></span>
+            Upgrade to unlock{" "}
+            <span className="ml-2 inline-flex items-center">
+              <LockIcon className="h-4 w-4 text-white/80" />
+            </span>
           </Link>
         </div>
       </div>
@@ -48,7 +51,8 @@ function LockedCard() {
 export const runtime = "nodejs";
 
 export default async function MacroPage() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (await getRequestBaseUrl());
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL || (await getRequestBaseUrl());
   const cookieHeader = cookies().toString();
 
   const meRes = await fetch(`${baseUrl}/api/me`, {
@@ -57,7 +61,9 @@ export default async function MacroPage() {
   }).catch(() => null);
 
   const meJson = await meRes?.json().catch(() => null);
-  const plan: Plan = normalizePlan(meJson?.profile?.plan ?? meJson?.plan ?? "free") as Plan;
+  const plan: Plan = normalizePlan(
+    meJson?.profile?.plan ?? meJson?.plan ?? "free",
+  ) as Plan;
   const isAdmin: boolean = !!(meJson?.is_admin ?? meJson?.profile?.is_admin);
 
   let items: Idea[] = [];
@@ -66,7 +72,8 @@ export default async function MacroPage() {
   try {
     const res = await fetch(`${baseUrl}/api/ideas`, { cache: "no-store" });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) errorMsg = json?.error ?? `Failed to load ideas (${res.status})`;
+    if (!res.ok)
+      errorMsg = json?.error ?? `Failed to load ideas (${res.status})`;
     else items = (json?.data ?? []) as Idea[];
   } catch (e: any) {
     errorMsg = e?.message ?? "Failed to load ideas.";
@@ -77,58 +84,72 @@ export default async function MacroPage() {
 
   return (
     <main className="mx-auto max-w-6xl p-6 text-white">
-<div className="relative">
-  <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-3xl bg-black/70 backdrop-blur-sm">
-    <div className="text-center">
-      <div className="text-xs tracking-[0.35em] text-white/50">SHORT-IT</div>
-      <div className="mt-2 text-3xl font-semibold tracking-tight text-white">Coming Soon</div>
-      <div className="mt-2 text-sm text-white/60">Macro is being built right now.</div>
-    </div>
-  </div>
-
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Macro</h1>
-        <p className="mt-1 text-sm text-white/60">LEVEL III — only unlocked for Macro members.</p>
-      </div>
-
-      {errorMsg && (
-        <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {errorMsg}
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-3xl bg-black/70 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="text-xs tracking-[0.35em] text-white/50">
+              SHORT-IT
+            </div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-white">
+              Coming Soon
+            </div>
+            <div className="mt-2 text-sm text-white/60">
+              Macro is being built right now.
+            </div>
+          </div>
         </div>
-      )}
 
-      <div className="mt-8 flex gap-4 overflow-x-auto pb-4">
-        {four.map((i) => {
-          if (!allowed) return <LockedCard key={`locked-${i.id}`} />;
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Macro</h1>
+          <p className="mt-1 text-sm text-white/60">
+            LEVEL III — only unlocked for Macro members.
+          </p>
+        </div>
 
-          return (
-            <Link
-              key={i.id}
-              href={`/ideas/${i.slug}`}
-              className="min-w-[320px] max-w-[360px] shrink-0 rounded-2xl border border-white/10 bg-black/40 p-5 transition hover:border-white/20 hover:bg-black/60"
-            >
-              <div className="flex items-center justify-between">
-                <div className="text-xs tracking-widest text-white/50">{i.ticker}</div>
-                <span className="rounded-full px-3 py-1 text-xs font-semibold bg-red-500/15 text-red-200 border border-red-500/25">
-                  LEVEL III
-                </span>
-              </div>
-              <div className="mt-3 text-lg font-semibold leading-snug">{i.title}</div>
-              <p className="mt-3 text-sm text-white/70 line-clamp-3">
-                Open to view macro section.
-              </p>
-              <div className="mt-4 text-xs text-white/40">{new Date(i.created_at).toLocaleString()}</div>
-            </Link>
-          );
-        })}
-
-        {!errorMsg && four.length === 0 && (
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
-            No published ideas yet.
+        {errorMsg && (
+          <div className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+            {errorMsg}
           </div>
         )}
+
+        <div className="mt-8 flex gap-4 overflow-x-auto pb-4">
+          {four.map((i) => {
+            if (!allowed) return <LockedCard key={`locked-${i.id}`} />;
+
+            return (
+              <Link
+                key={i.id}
+                href={`/ideas/${i.slug}`}
+                className="min-w-[320px] max-w-[360px] shrink-0 rounded-2xl border border-white/10 bg-black/40 p-5 transition hover:border-white/20 hover:bg-black/60"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-xs tracking-widest text-white/50">
+                    {i.ticker}
+                  </div>
+                  <span className="rounded-full px-3 py-1 text-xs font-semibold bg-red-500/15 text-red-200 border border-red-500/25">
+                    LEVEL III
+                  </span>
+                </div>
+                <div className="mt-3 text-lg font-semibold leading-snug">
+                  {i.title}
+                </div>
+                <p className="mt-3 text-sm text-white/70 line-clamp-3">
+                  Open to view macro section.
+                </p>
+                <div className="mt-4 text-xs text-white/40">
+                  {new Date(i.created_at).toLocaleString()}
+                </div>
+              </Link>
+            );
+          })}
+
+          {!errorMsg && four.length === 0 && (
+            <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
+              No published ideas yet.
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-</main>
+    </main>
   );
 }

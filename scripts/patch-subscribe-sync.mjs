@@ -10,7 +10,9 @@ if (!s.includes("async function syncPlan()")) {
 
   const m = s.match(planDeclRe);
   if (!m) {
-    console.error("❌ Could not find: const [plan, setPlan] = useState(...\"free\");");
+    console.error(
+      '❌ Could not find: const [plan, setPlan] = useState(..."free");',
+    );
     process.exit(1);
   }
 
@@ -34,7 +36,9 @@ if (!useEffectRe.test(s)) {
   const altRe =
     /useEffect\(\(\)\s*=>\s*\{[\s\S]*?fetch\(\s*["']\/api\/me\/plan["'][\s\S]*?\}\s*,\s*\[\s*\]\s*\)\s*;/m;
   if (altRe.test(s)) {
-    s = s.replace(altRe, `useEffect(() => {
+    s = s.replace(
+      altRe,
+      `useEffect(() => {
     (async () => {
       try {
         // ✅ restore purchases if Stripe says you are subscribed
@@ -44,13 +48,18 @@ if (!useEffectRe.test(s)) {
         if (json?.plan) setPlan(json.plan);
       } catch {}
     })();
-  }, []);`);
+  }, []);`,
+    );
   } else {
-    console.error("❌ Could not find a useEffect that fetches /api/me/plan to replace.");
+    console.error(
+      "❌ Could not find a useEffect that fetches /api/me/plan to replace.",
+    );
     process.exit(1);
   }
 } else {
-  s = s.replace(useEffectRe, `useEffect(() => {
+  s = s.replace(
+    useEffectRe,
+    `useEffect(() => {
     (async () => {
       try {
         // ✅ restore purchases if Stripe says you are subscribed
@@ -60,7 +69,8 @@ if (!useEffectRe.test(s)) {
         if (json?.plan) setPlan(json.plan);
       } catch {}
     })();
-  }, []);`);
+  }, []);`,
+  );
 }
 
 fs.writeFileSync(file, s, "utf8");

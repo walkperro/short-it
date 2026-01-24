@@ -3,7 +3,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-export async function GET(_req: Request, ctx: { params: Promise<{ slug: string }> }) {
+export async function GET(
+  _req: Request,
+  ctx: { params: Promise<{ slug: string }> },
+) {
   const { slug } = await ctx.params;
 
   // Find idea by slug (public-safe) then fetch conviction by idea_id
@@ -13,8 +16,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ slug: string }
     .eq("slug", slug)
     .maybeSingle();
 
-  if (ideaErr) return NextResponse.json({ error: ideaErr.message }, { status: 500 });
-  if (!idea || idea.status !== "published") return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (ideaErr)
+    return NextResponse.json({ error: ideaErr.message }, { status: 500 });
+  if (!idea || idea.status !== "published")
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { data: conv, error: convErr } = await supabaseAdmin
     .from("convictions")
@@ -23,7 +28,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ slug: string }
     .eq("status", "published")
     .maybeSingle();
 
-  if (convErr) return NextResponse.json({ error: convErr.message }, { status: 500 });
+  if (convErr)
+    return NextResponse.json({ error: convErr.message }, { status: 500 });
   if (!conv) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json({

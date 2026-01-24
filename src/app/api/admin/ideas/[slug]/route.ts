@@ -26,9 +26,13 @@ function isOptionKind(kind: string | null) {
   return kind === "Buy Option" || kind === "Sell Option";
 }
 
-export async function PUT(req: Request, context: { params: Promise<{ slug: string }> }) {
+export async function PUT(
+  req: Request,
+  context: { params: Promise<{ slug: string }> },
+) {
   const admin = await requireAdmin();
-  if (!admin.ok) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  if (!admin.ok)
+    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const { slug } = await context.params;
   const body = await req.json().catch(() => ({}));
@@ -39,38 +43,48 @@ export async function PUT(req: Request, context: { params: Promise<{ slug: strin
     .eq("slug", slug)
     .maybeSingle();
 
-  if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (exErr)
+    return NextResponse.json({ error: exErr.message }, { status: 500 });
+  if (!existing)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const kind = body?.kind ? String(body.kind) : null;
   const option = isOptionKind(kind);
   const nowIso = new Date().toISOString();
 
   const nextStatus: "draft" | "published" | null =
-    body?.status === "draft" ? "draft" : body?.status === "published" ? "published" : null;
+    body?.status === "draft"
+      ? "draft"
+      : body?.status === "published"
+        ? "published"
+        : null;
 
   const patch: any = {};
 
   if (typeof body?.locked === "boolean") patch.locked = body.locked;
   if (kind != null) patch.kind = kind;
-  if (body?.ticker != null) patch.ticker = String(body.ticker).trim().toUpperCase();
+  if (body?.ticker != null)
+    patch.ticker = String(body.ticker).trim().toUpperCase();
 
-  if (body?.direction !== undefined) patch.direction = option ? null : body.direction;
+  if (body?.direction !== undefined)
+    patch.direction = option ? null : body.direction;
   if (body?.entry !== undefined) patch.entry = body.entry;
   if (body?.reach !== undefined) patch.reach = body.reach;
 
-  if (body?.option_side !== undefined) patch.option_side = option ? body.option_side : null;
+  if (body?.option_side !== undefined)
+    patch.option_side = option ? body.option_side : null;
   if (body?.context !== undefined) patch.context = body.context;
 
   // Strike/Exp: option-only
   if (body?.strike !== undefined) patch.strike = option ? body.strike : null;
 
   // exp is DATE column now; accept "YYYY-MM-DD" string or null
-  if (body?.exp !== undefined) patch.exp = option ? (body.exp || null) : null;
+  if (body?.exp !== undefined) patch.exp = option ? body.exp || null : null;
 
   if (nextStatus) {
     patch.status = nextStatus;
-    if (nextStatus === "published" && !existing.published_at) patch.published_at = nowIso;
+    if (nextStatus === "published" && !existing.published_at)
+      patch.published_at = nowIso;
   }
 
   if (!existing.start_date) patch.start_date = nowIso;
@@ -80,22 +94,28 @@ export async function PUT(req: Request, context: { params: Promise<{ slug: strin
     .update(patch)
     .eq("slug", slug)
     .select(
-      "id,slug,idea_no,created_at,published_at,status,locked,kind,ticker,direction,entry,reach,option_side,context,strike,exp"
+      "id,slug,idea_no,created_at,published_at,status,locked,kind,ticker,direction,entry,reach,option_side,context,strike,exp",
     )
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
 }
 
-export async function DELETE(_req: Request, context: { params: Promise<{ slug: string }> }) {
+export async function DELETE(
+  _req: Request,
+  context: { params: Promise<{ slug: string }> },
+) {
   const admin = await requireAdmin();
-  if (!admin.ok) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  if (!admin.ok)
+    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const { slug } = await context.params;
 
   const { error } = await supabaseAdmin.from("ideas").delete().eq("slug", slug);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }

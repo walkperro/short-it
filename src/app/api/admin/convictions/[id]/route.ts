@@ -6,7 +6,9 @@ export const runtime = "nodejs";
 
 async function requireAdmin() {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return { ok: false as const, user: null };
 
   const { data: prof } = await supabaseAdmin
@@ -19,9 +21,13 @@ async function requireAdmin() {
   return { ok: true as const, user };
 }
 
-export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function PUT(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
   const admin = await requireAdmin();
-  if (!admin.ok) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  if (!admin.ok)
+    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const { id } = await ctx.params;
   const body = await req.json().catch(() => ({}));
@@ -31,7 +37,11 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
   if (body?.body !== undefined) patch.body = body.body ?? null;
 
   const nextStatus: "draft" | "published" | null =
-    body?.status === "draft" ? "draft" : body?.status === "published" ? "published" : null;
+    body?.status === "draft"
+      ? "draft"
+      : body?.status === "published"
+        ? "published"
+        : null;
 
   if (nextStatus) {
     patch.status = nextStatus;
@@ -45,17 +55,26 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
     .select("id,idea_id,status,body,created_at,published_at")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  _req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
   const admin = await requireAdmin();
-  if (!admin.ok) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  if (!admin.ok)
+    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const { id } = await ctx.params;
-  const { error } = await supabaseAdmin.from("convictions").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const { error } = await supabaseAdmin
+    .from("convictions")
+    .delete()
+    .eq("id", id);
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
 }

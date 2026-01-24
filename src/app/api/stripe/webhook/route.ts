@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { sendShortItAccessEmail } from "@/lib/email/shortit";
+import { sendGAEvent } from "@/lib/analytics/ga";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,13 @@ function tierFromPriceId(priceId?: string | null) {
   if (priceId === process.env.STRIPE_PRICE_CONVICTION) return "conviction";
   if (priceId === process.env.STRIPE_PRICE_MACRO) return "macro";
   return null;
+}
+
+function tierRank(tier: string | null) {
+  if (tier === "ideas") return 1;
+  if (tier === "conviction") return 2;
+  if (tier === "macro") return 3;
+  return 0;
 }
 
 function levelFromTier(tier: string) {
@@ -33,7 +41,10 @@ export async function POST(req: Request) {
   const sig = req.headers.get("stripe-signature");
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!sig || !secret) {
-    return NextResponse.json({ error: "Missing webhook secret/signature" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing webhook secret/signature" },
+      { status: 400 },
+    );
   }
 
   const rawBody = await req.text();
@@ -42,7 +53,10 @@ export async function POST(req: Request) {
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, secret);
   } catch (err: any) {
-    return NextResponse.json({ error: `Webhook signature verification failed: ${err?.message}` }, { status: 400 });
+    return NextResponse.json(
+      { error: `Webhook signature verification failed: ${err?.message}` },
+      { status: 400 },
+    );
   }
 
   try {
@@ -86,6 +100,19 @@ export async function POST(req: Request) {
         });
       }
 
+      // ✅ GA event (non-blocking)
+      if (customerId) {
+        await sendGAEvent({
+          clientId: customerId,
+          name: "subscription_created",
+          params: {
+            tier,
+            plan_label: planLabel(tier),
+            event_source: "checkout.session.completed",
+          },
+        });
+      }
+
       return NextResponse.json({ received: true });
     }
 
@@ -107,9 +134,79 @@ export async function POST(req: Request) {
           .update({
             stripe_customer_id: customerId,
             stripe_subscription_id: sub.id,
-            plan: event.type === "customer.subscription.deleted" ? "free" : (tier ?? "free"),
+            plan:
+              event.type === "customer.subscription.deleted"
+                ? "free"
+                : (tier ?? "free"),
           })
           .eq("stripe_customer_id", customerId);
+      }
+
+      // ✅ GA events (non-blocking)
+      try {
+        if (customerId) {
+          if (event.type === "customer.subscription.created") {
+            await sendGAEvent({
+              clientId: customerId,
+              name: "subscription_created",
+              params: {
+                tier: tier ?? "unknown",
+                event_source: "customer.subscription.created",
+              },
+            });
+          }
+
+          if (event.type === "customer.subscription.deleted") {
+            await sendGAEvent({
+              clientId: customerId,
+              name: "subscription_canceled",
+              params: { event_source: "customer.subscription.deleted" },
+            });
+          }
+
+          if (event.type === "customer.subscription.updated") {
+            // Detect upgrade/downgrade based on previous_attributes (if price changed)
+            const prev = (event.data as any)?.previous_attributes ?? null;
+
+            const prevPriceId =
+              prev?.items?.data?.[0]?.price?.id ??
+              prev?.items?.data?.[0]?.price ??
+              null;
+
+            const prevTier = tierFromPriceId(prevPriceId);
+            const newTier = tier;
+
+            if (prevTier && newTier && prevTier !== newTier) {
+              const upgrading = tierRank(newTier) > tierRank(prevTier);
+              await sendGAEvent({
+                clientId: customerId,
+                name: upgrading
+                  ? "subscription_upgraded"
+                  : "subscription_downgraded",
+                params: {
+                  from_tier: prevTier,
+                  to_tier: newTier,
+                  subscription_id: sub.id,
+                  event_source: "customer.subscription.updated",
+                },
+              });
+            } else {
+              // Generic update (status changes, etc.)
+              await sendGAEvent({
+                clientId: customerId,
+                name: "subscription_updated",
+                params: {
+                  tier: newTier ?? "unknown",
+                  status: sub.status,
+                  subscription_id: sub.id,
+                  event_source: "customer.subscription.updated",
+                },
+              });
+            }
+          }
+        }
+      } catch {
+        // swallow
       }
 
       return NextResponse.json({ received: true });
@@ -120,11 +217,14 @@ export async function POST(req: Request) {
       const invoice = event.data.object as Stripe.Invoice;
 
       const customerId = invoice.customer?.toString() ?? null;
-      const subId = ((invoice as any).subscription ?? null)?.toString?.() ?? null;
+      const subId =
+        ((invoice as any).subscription ?? null)?.toString?.() ?? null;
 
       let priceId: string | null = null;
       if (subId) {
-        const sub = await stripe.subscriptions.retrieve(subId, { expand: ["items.data.price"] });
+        const sub = await stripe.subscriptions.retrieve(subId, {
+          expand: ["items.data.price"],
+        });
         priceId = (sub.items.data[0]?.price as any)?.id ?? null;
       }
 
@@ -137,11 +237,30 @@ export async function POST(req: Request) {
           .eq("stripe_customer_id", customerId);
       }
 
+      // ✅ GA renewal/revenue signal
+      if (customerId) {
+        await sendGAEvent({
+          clientId: customerId,
+          name: "invoice_paid",
+          params: {
+            tier: tier ?? "unknown",
+            subscription_id: subId ?? undefined,
+            invoice_id: invoice.id,
+            amount_paid: (invoice.amount_paid ?? 0) / 100,
+            currency: invoice.currency ?? undefined,
+            event_source: "invoice.payment_succeeded",
+          },
+        });
+      }
+
       return NextResponse.json({ received: true });
     }
 
     return NextResponse.json({ received: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? "Webhook handler failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message ?? "Webhook handler failed" },
+      { status: 500 },
+    );
   }
 }

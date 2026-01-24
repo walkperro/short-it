@@ -29,7 +29,9 @@ export default function TopTabs() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const res = await fetch("/api/me", { cache: "no-store" }).catch(() => null);
+      const res = await fetch("/api/me", { cache: "no-store" }).catch(
+        () => null,
+      );
       if (!alive) return;
       const json = await res?.json().catch(() => ({}));
       setMe((json ?? { user: null }) as Me);
@@ -96,7 +98,13 @@ function Tab({
 
 function LockIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-80">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      className="opacity-80"
+    >
       <path
         d="M7 11V8a5 5 0 0 1 10 0v3"
         stroke="currentColor"

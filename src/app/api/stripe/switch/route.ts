@@ -56,6 +56,11 @@ export async function POST(req: NextRequest) {
   const downgrade_timing: DowngradeTiming =
     body?.downgrade_timing === "now" ? "now" : "renewal";
 
+  const ga_client_id_raw = body?.ga_client_id;
+  const ga_client_id =
+    typeof ga_client_id_raw === "string" && ga_client_id_raw.trim()
+      ? ga_client_id_raw.trim().slice(0, 64)
+      : null;
   if (!tier || !PRICE_BY_TIER[tier]) {
     return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
   }
@@ -88,7 +93,7 @@ export async function POST(req: NextRequest) {
   if (!customerId) {
     const customer = await stripe.customers.create({
       email: receiptEmail,
-      metadata: { userId: user.id },
+      metadata: { userId: user.id, ...(ga_client_id ? { ga_client_id } : {}) },
     });
     customerId = customer.id;
 
@@ -144,7 +149,11 @@ export async function POST(req: NextRequest) {
       items: [{ id: itemId, price: newPriceId }],
       proration_behavior: "create_prorations",
       billing_cycle_anchor: "unchanged",
-      metadata: { userId: user.id, tier },
+      metadata: {
+        userId: user.id,
+        tier,
+        ...(ga_client_id ? { ga_client_id } : {}),
+      },
     });
 
     let invoice = null;
@@ -173,7 +182,11 @@ export async function POST(req: NextRequest) {
       items: [{ id: itemId, price: newPriceId }],
       proration_behavior: "none",
       billing_cycle_anchor: "unchanged",
-      metadata: { userId: user.id, tier },
+      metadata: {
+        userId: user.id,
+        tier,
+        ...(ga_client_id ? { ga_client_id } : {}),
+      },
     });
 
     await supabaseAdmin
@@ -214,7 +227,11 @@ export async function POST(req: NextRequest) {
         items: [{ price: newPriceId, quantity: 1 }],
       },
     ],
-    metadata: { userId: user.id, tier },
+    metadata: {
+      userId: user.id,
+      tier,
+      ...(ga_client_id ? { ga_client_id } : {}),
+    },
   });
 
   return NextResponse.json({
